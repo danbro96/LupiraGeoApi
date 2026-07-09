@@ -1,0 +1,55 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>LupiraGeoApi</RootNamespace>
+  </PropertyGroup>
+
+  <!--
+    Emit the OpenAPI document at build time (no running server / DB) so the JSON spec stays in
+    lockstep with the Map* endpoints. `dotnet build` writes `openapi/LupiraGeoApi.json` at the
+    repo root; Marten is lazy and hosted services never start under doc-gen, so no infra is required.
+  -->
+  <PropertyGroup>
+    <OpenApiGenerateDocuments>true</OpenApiGenerateDocuments>
+    <OpenApiGenerateDocumentsOnBuild>true</OpenApiGenerateDocumentsOnBuild>
+    <OpenApiDocumentsDirectory>$(MSBuildThisFileDirectory)..\..\openapi</OpenApiDocumentsDirectory>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Expose internal helpers to the integration test assembly. -->
+    <InternalsVisibleTo Include="LupiraGeoApi.IntegrationTests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The bounded context (Domain + Application + Data). The host is a thin transport/composition
+         layer over it; the project boundary keeps ASP.NET out of the core. Marten / Npgsql flow in
+         transitively from Core. -->
+    <ProjectReference Include="..\LupiraGeoApi.Core\LupiraGeoApi.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.9" />
+    <PackageReference Include="Microsoft.OpenApi" Version="2.7.5" />
+    <PackageReference Include="Microsoft.Extensions.ApiDescription.Server" Version="10.0.9">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.9" />
+    <!-- Design-time only: enables `dotnet ef migrations` against GeoDbContext (host is the EF startup project). -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="1.4.0" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.16.0" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.16.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.15.2" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.15.1" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.1" />
+    <PackageReference Include="Scalar.AspNetCore" Version="2.16.5" />
+  </ItemGroup>
+
+</Project>

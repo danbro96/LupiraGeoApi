@@ -1,0 +1,57 @@
+# Sample Compose definition for lupira-geo-api.
+# Single .NET 10 service: gazetteer + geocoding + saved places, over its OWN Postgres database
+# (Marten `geo_user` schema + EF Core/PostGIS `geo` schema).
+#
+# NOTE: the default hostnames, network names, image, and port below are the author's own and are SAMPLES.
+# Every value is ${VAR:-default}-overridable — set the env (issuer URL, DB host/password, image, port, networks)
+# to your own environment before deploying. The external `*_data` / `*_telemetry` networks are the author's;
+# replace them (or drop to a single bridge network) for a generic deployment.
+#
+# PREREQUISITE: the Postgres server must have the PostGIS extension available, and it must be created in this
+# database once as a superuser (see deploy/db/grants.sql) — the app role cannot create it (postgis is untrusted).
+services:
+  lupira-geo-api:
+    image: danbro96/lupira-geo-api:${IMAGE_TAG:-latest}
+    container_name: lupira-geo-api
+    environment:
+      # Postgres — Marten `geo_user` schema + EF Core/PostGIS `geo` schema in one DB. NO grant on other apps' databases.
+      ConnectionStrings__Postgres: "Host=postgres;Port=5432;Database=lupira_geo;Username=lupira_geo_user;Password=${LUPIRA_GEO_DB_PASSWORD:?required}"
+
+      # REST auth — Authentik OIDC (JWT). Same issuer as the other Lupira apps; the OIDC `sub` is the only cross-service join key.
+      Auth__Authority: ${AUTH_AUTHORITY:-https://auth.lupira.com/application/o/lupira-geo/}
+      Auth__Audience: ${AUTH_AUDIENCE:-lupira-geo}
+
+      # Geocoding — self-hosted Nominatim (forward + reverse). Empty disables it (resolver provisions user places, no external call).
+      Nominatim__BaseUrl: ${NOMINATIM_BASE_URL:-}
+
+      # Gazetteer seed source (the `--seed-gazetteer` one-shot). Defaults to the public GeoNames dump.
+      Geonames__BaseUrl: ${GEONAMES_BASE_URL:-https://download.geonames.org/export/dump}
+
+      # OTEL — same Basic Auth header convention as the other .NET apps (http/protobuf; 5-min metric cadence).
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_EXPORTER_OTLP_PROTOCOL: ${OTEL_EXPORTER_OTLP_PROTOCOL:-http/protobuf}
+      OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:-}
+      OTEL_METRIC_EXPORT_INTERVAL: ${OTEL_METRIC_EXPORT_INTERVAL:-300000}
+      OTEL_RESOURCE_ATTRIBUTES: ${OTEL_RESOURCE_ATTRIBUTES:-deployment.environment=prod}
+    ports:
+      - "${HOST_PORT:-41680}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/readyz || exit 1"]
+      interval: 60s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - default
+      - medelynas_data         # Postgres
+      - medelynas_telemetry    # OTel collector
+networks:
+  default:
+    driver: bridge
+  medelynas_data:
+    external: true
+    name: medelynas_data
+  medelynas_telemetry:
+    external: true
+    name: medelynas_telemetry
