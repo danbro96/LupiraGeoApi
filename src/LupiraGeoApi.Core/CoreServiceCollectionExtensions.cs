@@ -4,6 +4,8 @@ using LupiraGeoApi.Domain;
 using Marten;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
+using JasperFx;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
@@ -26,6 +28,10 @@ public static class CoreServiceCollectionExtensions
             var opts = new StoreOptions();
             opts.Connection(cs);
             opts.UseLupiraGeo();
+            // Schema is a deliberate --apply-schema step in prod (postgres-marten-prod.md); dev self-applies on boot.
+            opts.AutoCreateSchemaObjects = sp.GetRequiredService<IHostEnvironment>().IsDevelopment()
+                ? AutoCreate.CreateOrUpdate
+                : AutoCreate.None;
             return opts;
         }).UseLightweightSessions();
 
