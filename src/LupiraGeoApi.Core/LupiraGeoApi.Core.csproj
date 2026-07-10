@@ -19,6 +19,8 @@
          on the `geo` schema (the gazetteer + admin reference data, with real geography columns + GiST). The
          schemas are disjoint so Marten's schema-diff never touches the EF tables. No ASP.NET here. -->
     <PackageReference Include="Marten" Version="9.10.0" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.9" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL.NetTopologySuite" Version="10.0.0" />
   </ItemGroup>

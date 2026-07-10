@@ -100,4 +100,37 @@ public sealed class PlacesTests(GeoApiTestFactory factory) : IntegrationTest(fac
         var resp = await api.GetAsync($"/places/{Guid.NewGuid()}");
         Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
     }
+
+    [Fact]
+    public async Task Unknown_external_id_is_404()
+    {
+        var api = Factory.ApiClient(Email);
+        var resp = await api.GetAsync("/places/by-external/Osm/node/999999");
+        Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task Batch_resolve_aligns_with_input_and_dedupes()
+    {
+        var api = Factory.ApiClient(Email);
+        var resp = await api.PostAsJsonAsync("/places/resolve:batch",
+            new ResolvePlacesBatchRequest { Texts = ["Cafe A", "Cafe B", "cafe a"] });
+        resp.EnsureSuccessStatusCode();
+        var resolved = (await resp.Content.ReadFromJsonAsync<List<ResolvePlaceResponse>>())!;
+
+        Assert.Equal(3, resolved.Count);
+        Assert.Equal("Cafe A", resolved[0].Name);
+        Assert.Equal("Cafe B", resolved[1].Name);
+        Assert.Equal(resolved[0].PlaceId, resolved[2].PlaceId); // same text → same place
+        Assert.NotEqual(resolved[0].PlaceId, resolved[1].PlaceId);
+    }
+
+    [Fact]
+    public async Task Batch_resolve_caps_the_batch_size()
+    {
+        var api = Factory.ApiClient(Email);
+        var resp = await api.PostAsJsonAsync("/places/resolve:batch",
+            new ResolvePlacesBatchRequest { Texts = [.. Enumerable.Range(0, 51).Select(i => $"Place {i}")] });
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
 }

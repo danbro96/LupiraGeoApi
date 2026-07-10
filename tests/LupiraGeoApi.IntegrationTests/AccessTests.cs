@@ -8,6 +8,8 @@ public sealed class AccessTests(GeoApiTestFactory factory) : IntegrationTest(fac
 {
     [Theory]
     [InlineData("/places")]
+    [InlineData("/places/suggest?q=x")]
+    [InlineData("/places/by-external/Osm/node/1")]
     [InlineData("/geocode/forward?q=x")]
     [InlineData("/admin-areas")]
     [InlineData("/me")]

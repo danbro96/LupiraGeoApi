@@ -19,3 +19,6 @@ public enum ExternalScheme { Osm, Wikidata, Google, Geonames }
 
 /// <summary>Level of an <see cref="AdminArea"/> in the containment tree (Locality → Region → Country).</summary>
 public enum AdminLevel { Country, Region, Locality }
+
+/// <summary>What a typeahead suggestion points at: a gazetteer <see cref="Place"/> or an <see cref="AdminArea"/> locality.</summary>
+public enum SuggestionType { Place, Locality }

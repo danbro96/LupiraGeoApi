@@ -217,12 +217,136 @@
         ]
       }
     },
+    "/places/suggest": {
+      "get": {
+        "tags": [
+          "Places"
+        ],
+        "summary": "Typeahead: trigram-ranked suggestions over places (names + aliases) and AdminArea localities, discriminated by type.",
+        "operationId": "SuggestPlaces",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlaceSuggestionDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/places/by-external/{scheme}/{value}": {
+      "get": {
+        "tags": [
+          "Places"
+        ],
+        "summary": "Look a place up by an external gazetteer key, e.g. /places/by-external/Osm/node/123.",
+        "operationId": "GetPlaceByExternalId",
+        "parameters": [
+          {
+            "name": "scheme",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ExternalScheme"
+            }
+          },
+          {
+            "name": "value",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaceDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
     "/places/{id}": {
       "get": {
         "tags": [
           "Places"
         ],
-        "summary": "A single place with its aliases, external ids, and containment chain (outermost→innermost).",
+        "summary": "A single place with its aliases, external ids, and containment chain (outermost→innermost). Follows merge redirects.",
         "operationId": "GetPlace",
         "parameters": [
           {
@@ -321,6 +445,197 @@
         ]
       }
     },
+    "/places/{id}/aliases": {
+      "post": {
+        "tags": [
+          "Places"
+        ],
+        "summary": "Add an alternate name (optional language tag) to a place; resolve and suggest match aliases.",
+        "operationId": "AddPlaceAlias",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddAliasRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaceDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/places/{id}/aliases/{aliasId}": {
+      "delete": {
+        "tags": [
+          "Places"
+        ],
+        "summary": "Remove an alias from a place.",
+        "operationId": "RemovePlaceAlias",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "aliasId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/places/{id}/merge": {
+      "post": {
+        "tags": [
+          "Places"
+        ],
+        "summary": "Merge a duplicate into the survivor (intoPlaceId): names become aliases, external ids and saved places move over, and the duplicate id keeps resolving via a tombstone redirect.",
+        "operationId": "MergePlace",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergePlaceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaceDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
     "/places/resolve": {
       "post": {
         "tags": [
@@ -345,6 +660,58 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ResolvePlaceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/places/resolve:batch": {
+      "post": {
+        "tags": [
+          "Places"
+        ],
+        "summary": "Bulk resolve (max 50 texts); responses align index-for-index with the input.",
+        "operationId": "ResolvePlacesBatch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolvePlacesBatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ResolvePlaceResponse"
+                  }
                 }
               }
             }
@@ -774,6 +1141,23 @@
   },
   "components": {
     "schemas": {
+      "AddAliasRequest": {
+        "required": [
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "lang": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "AdminAreaDto": {
         "required": [
           "id",
@@ -1012,6 +1396,40 @@
           }
         }
       },
+      "MergePlaceRequest": {
+        "required": [
+          "intoPlaceId"
+        ],
+        "type": "object",
+        "properties": {
+          "intoPlaceId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "PlaceAliasDto": {
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "lang": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "PlaceCategory": {
         "enum": [
           "Unknown",
@@ -1112,7 +1530,7 @@
           "aliases": {
             "type": "array",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/PlaceAliasDto"
             }
           },
           "containment": {
@@ -1156,6 +1574,60 @@
           "Geocoded",
           "Imported"
         ]
+      },
+      "PlaceSuggestionDto": {
+        "required": [
+          "id",
+          "type",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "$ref": "#/components/schemas/SuggestionType"
+          },
+          "name": {
+            "type": "string"
+          },
+          "category": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PlaceCategory"
+              }
+            ]
+          },
+          "latitude": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "longitude": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "context": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
       },
       "ProblemDetails": {
         "type": "object",
@@ -1240,6 +1712,20 @@
           }
         }
       },
+      "ResolvePlacesBatchRequest": {
+        "required": [
+          "texts"
+        ],
+        "type": "object",
+        "properties": {
+          "texts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "SavedPlaceDto": {
         "required": [
           "id",
@@ -1290,6 +1776,12 @@
             "type": "boolean"
           }
         }
+      },
+      "SuggestionType": {
+        "enum": [
+          "Place",
+          "Locality"
+        ]
       },
       "UpdatePlaceRequest": {
         "type": "object",

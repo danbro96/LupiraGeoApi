@@ -16,7 +16,7 @@ public static class MartenRegistrations
         opts.UseSystemTextJsonForSerialization(EnumStorage.AsString);
 
         opts.Schema.For<Principal>().Index(x => x.AuthentikSub).Index(x => x.Email);
-        opts.Schema.For<SavedPlace>().Index(x => x.PrincipalId);
+        opts.Schema.For<SavedPlace>().Index(x => x.PrincipalId).Index(x => x.PlaceId);
         opts.Schema.For<GeocodeCache>();
 
         return opts;

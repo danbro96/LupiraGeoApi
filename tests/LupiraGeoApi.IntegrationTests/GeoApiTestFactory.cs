@@ -22,11 +22,14 @@ public sealed class GeoApiTestFactory : WebApplicationFactory<Program>
 
     public GeoApiTestFactory() => _postgres.StartAsync().GetAwaiter().GetResult();
 
+    /// <summary>Extra config keys (e.g. Nominatim stub URLs) — populate before the first client is created.</summary>
+    public Dictionary<string, string?> ExtraConfig { get; } = [];
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
         builder.ConfigureAppConfiguration(cfg =>
-            cfg.AddInMemoryCollection(new Dictionary<string, string?>
+            cfg.AddInMemoryCollection(new Dictionary<string, string?>(ExtraConfig)
             {
                 ["ConnectionStrings:Postgres"] = _postgres.GetConnectionString(),
             }));

@@ -42,6 +42,9 @@ public sealed class GeoDbContext(DbContextOptions<GeoDbContext> options) : DbCon
 
             e.HasOne(p => p.WithinArea).WithMany()
                 .HasForeignKey(p => p.WithinAreaId).OnDelete(DeleteBehavior.SetNull);
+            e.HasIndex(p => p.MergedIntoId);
+            e.HasOne(p => p.MergedInto).WithMany()
+                .HasForeignKey(p => p.MergedIntoId).OnDelete(DeleteBehavior.Restrict);
             e.HasMany(p => p.Aliases).WithOne()
                 .HasForeignKey(a => a.PlaceId).OnDelete(DeleteBehavior.Cascade);
             e.HasMany(p => p.ExternalIds).WithOne()

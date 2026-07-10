@@ -23,6 +23,10 @@ services:
 
       # Geocoding — self-hosted Nominatim (forward + reverse). Empty disables it (resolver provisions user places, no external call).
       Nominatim__BaseUrl: ${NOMINATIM_BASE_URL:-}
+      # Optional public fallback for queries outside the self-hosted extract's coverage. Throttled to ≤1 req/s and
+      # cached forever (resolve-once). Set the User-Agent to identify YOUR deployment per the public usage policy.
+      Nominatim__FallbackBaseUrl: ${NOMINATIM_FALLBACK_BASE_URL:-}
+      Nominatim__UserAgent: ${NOMINATIM_USER_AGENT:-}
 
       # Gazetteer seed source (the `--seed-gazetteer` one-shot). Defaults to the public GeoNames dump.
       Geonames__BaseUrl: ${GEONAMES_BASE_URL:-https://download.geonames.org/export/dump}

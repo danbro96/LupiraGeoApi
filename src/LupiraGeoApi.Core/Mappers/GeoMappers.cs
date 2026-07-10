@@ -35,7 +35,7 @@ public static class GeoMappers
         Verified = p.Verified,
         WithinAreaId = p.WithinAreaId,
         DistanceM = distanceM,
-        Aliases = p.Aliases.Select(x => x.Name).ToList(),
+        Aliases = p.Aliases.Select(x => new PlaceAliasDto { Id = x.Id, Name = x.Name, Lang = x.Lang }).ToList(),
         ExternalIds = p.ExternalIds.Select(x => new PlaceExternalIdDto { Scheme = x.Scheme, Value = x.Value }).ToList(),
     };
 

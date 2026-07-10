@@ -11,7 +11,10 @@ MCP (LAN-only). See [docs/architecture.md](docs/architecture.md).
 ## Surface
 
 - `GET /places` — search: text (`q`), `category`/`kind`, containment (`withinAreaId`), proximity (`nearLat`+`nearLon`[+`radiusM`]) or viewport (`bbox`).
-- `GET /places/{id}` · `POST /places` · `PATCH /places/{id}` · `POST /places/resolve`
+- `GET /places/suggest` — trigram typeahead over place names/aliases + localities.
+- `GET /places/{id}` (follows merge redirects) · `GET /places/by-external/{scheme}/{value}` · `POST /places` · `PATCH /places/{id}`
+- `POST /places/{id}/aliases` · `DELETE /places/{id}/aliases/{aliasId}` · `POST /places/{id}/merge`
+- `POST /places/resolve` · `POST /places/resolve:batch`
 - `GET /geocode/reverse` · `GET /geocode/forward`
 - `GET /admin-areas` · `GET /admin-areas/{id}`
 - `GET|POST|PATCH|DELETE /me/places` — saved places
@@ -31,6 +34,8 @@ dotnet test tests/LupiraGeoApi.IntegrationTests   # integration (Testcontainers 
 ```
 
 Geocoding is optional: set `Nominatim__BaseUrl` to enable it (unset → resolver provisions user places, no external call).
+`Nominatim__FallbackBaseUrl` adds a public fallback for out-of-coverage queries — throttled to ≤1 req/s, frozen into the
+cache after one call; set `Nominatim__UserAgent` to identify your deployment per the public usage policy.
 
 ## Migrations
 

@@ -27,9 +27,16 @@ public sealed class PlaceDto
     public required bool Verified { get; set; }
     public Guid? WithinAreaId { get; set; }
     public double? DistanceM { get; set; }
-    public List<string> Aliases { get; set; } = [];
+    public List<PlaceAliasDto> Aliases { get; set; } = [];
     public List<AdminAreaDto> Containment { get; set; } = [];
     public List<PlaceExternalIdDto> ExternalIds { get; set; } = [];
+}
+
+public sealed class PlaceAliasDto
+{
+    public required Guid Id { get; set; }
+    public required string Name { get; set; }
+    public string? Lang { get; set; }
 }
 
 public sealed class PlaceExternalIdDto
@@ -37,6 +44,26 @@ public sealed class PlaceExternalIdDto
     [JsonConverter(typeof(JsonStringEnumConverter<ExternalScheme>))]
     public required ExternalScheme Scheme { get; set; }
     public required string Value { get; set; }
+}
+
+/// <summary>A typeahead suggestion: a gazetteer place (name/alias trigram match) or an AdminArea locality — cities come
+/// from the GeoNames seed, so they suggest without anyone having geocoded a POI there. <c>Context</c> disambiguates
+/// (formatted address for places, parent area for localities).</summary>
+public sealed class PlaceSuggestionDto
+{
+    public required Guid Id { get; set; }
+
+    [JsonConverter(typeof(JsonStringEnumConverter<SuggestionType>))]
+    public required SuggestionType Type { get; set; }
+
+    public required string Name { get; set; }
+
+    [JsonConverter(typeof(JsonStringEnumConverter<PlaceCategory>))]
+    public PlaceCategory? Category { get; set; }
+
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
+    public string? Context { get; set; }
 }
 
 /// <summary>Create a user place directly (name + optional coordinates/category). The missing write path today.</summary>
@@ -57,6 +84,25 @@ public sealed class UpdatePlaceRequest
     public string? Name { get; set; }
     public PlaceCategory? Category { get; set; }
     public bool? Verified { get; set; }
+}
+
+public sealed class AddAliasRequest
+{
+    public required string Name { get; set; }
+    public string? Lang { get; set; }
+}
+
+/// <summary>Merge the addressed place into <see cref="IntoPlaceId"/> (the survivor). The addressed id becomes a
+/// tombstone redirect, so ids held by other services keep resolving.</summary>
+public sealed class MergePlaceRequest
+{
+    public required Guid IntoPlaceId { get; set; }
+}
+
+/// <summary>Bulk <see cref="ResolvePlaceRequest"/> — for imports. Responses align index-for-index with the input.</summary>
+public sealed class ResolvePlacesBatchRequest
+{
+    public required List<string> Texts { get; set; }
 }
 
 /// <summary>Resolve free-text to a place id — match an existing entry, geocode, or provisionally create. This is what

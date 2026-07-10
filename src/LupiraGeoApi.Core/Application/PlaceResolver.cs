@@ -7,7 +7,7 @@ namespace LupiraGeoApi.Application;
 
 /// <summary>
 /// Resolves a free-text location to a gazetteer <see cref="Place"/> — the write path that replaces LupiraCalApi's
-/// global exact-string dedup. Strategy: (1) match an existing place by case-insensitive name; (2) else forward-geocode
+/// global exact-string dedup. Strategy: (1) match an existing place by case-insensitive name or alias; (2) else forward-geocode
 /// and, if coordinates come back, dedupe by name+proximity or create a <see cref="PlaceSource.Geocoded"/> place with
 /// coordinates and an on-demand <see cref="AdminArea"/> containment chain; (3) else provisionally create an unverified
 /// <see cref="PlaceSource.User"/> place with no coordinates. The unique-ish match + upsert removes the query-then-insert
@@ -22,8 +22,9 @@ public sealed class PlaceResolver(GeoDbContext db, GeocodingService geocoder)
         if (string.IsNullOrWhiteSpace(text)) return null;
         var name = string.Join(' ', text.Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
-        // (1) Existing place by case-insensitive name.
-        var existing = await db.Places.FirstOrDefaultAsync(p => EF.Functions.ILike(p.CanonicalName, name), ct);
+        // (1) Existing place by case-insensitive name or alias.
+        var existing = await db.Places.FirstOrDefaultAsync(p => p.MergedIntoId == null &&
+            (EF.Functions.ILike(p.CanonicalName, name) || p.Aliases.Any(a => EF.Functions.ILike(a.Name, name))), ct);
         if (existing is not null) return existing;
 
         // (2) Forward-geocode. First hit with coordinates wins.
@@ -33,7 +34,8 @@ public sealed class PlaceResolver(GeoDbContext db, GeocodingService geocoder)
             var point = new Point(hit.Lon, hit.Lat) { SRID = 4326 };
 
             var near = await db.Places
-                .Where(p => p.Location != null && p.Location.Distance(point) <= DedupeMeters && EF.Functions.ILike(p.CanonicalName, name))
+                .Where(p => p.MergedIntoId == null && p.Location != null
+                    && p.Location.Distance(point) <= DedupeMeters && EF.Functions.ILike(p.CanonicalName, name))
                 .FirstOrDefaultAsync(ct);
             if (near is not null) return near;
 

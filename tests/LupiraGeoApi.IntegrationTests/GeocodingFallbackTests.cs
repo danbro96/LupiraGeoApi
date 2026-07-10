@@ -1,0 +1,89 @@
+using System.Net.Http.Json;
+using LupiraGeoApi.Domain;
+using LupiraGeoApi.Dtos.Geocoding;
+using LupiraGeoApi.Dtos.Places;
+using Xunit;
+
+namespace LupiraGeoApi.IntegrationTests;
+
+/// <summary>Two Nominatim stubs: a "regional" primary that misses everything and a "public" fallback that hits.
+/// Own collection — the shared factory keeps Nominatim unset.</summary>
+public sealed class GeocodingFixture : IAsyncLifetime
+{
+    public NominatimStub Primary { get; private set; } = null!;
+    public NominatimStub Fallback { get; private set; } = null!;
+    public GeoApiTestFactory Factory { get; private set; } = null!;
+
+    public async Task InitializeAsync()
+    {
+        Primary = await NominatimStub.StartAsync(returnResults: false);
+        Fallback = await NominatimStub.StartAsync(returnResults: true);
+        Factory = new GeoApiTestFactory();
+        Factory.ExtraConfig["Nominatim:BaseUrl"] = Primary.BaseUrl;
+        Factory.ExtraConfig["Nominatim:FallbackBaseUrl"] = Fallback.BaseUrl;
+    }
+
+    public async Task DisposeAsync()
+    {
+        await Factory.DisposeAsync();
+        await Primary.DisposeAsync();
+        await Fallback.DisposeAsync();
+    }
+}
+
+[CollectionDefinition("geocoding")]
+public sealed class GeocodingCollection : ICollectionFixture<GeocodingFixture>;
+
+[Collection("geocoding")]
+public sealed class GeocodingFallbackTests(GeocodingFixture fx) : IAsyncLifetime
+{
+    const string Email = "alice@x.test";
+
+    public Task InitializeAsync() => fx.Factory.ResetAsync();
+    public Task DisposeAsync() => Task.CompletedTask;
+
+    [Fact]
+    public async Task Forward_falls_back_to_the_public_endpoint_and_freezes()
+    {
+        var api = fx.Factory.ApiClient(Email);
+        var (p0, f0) = (fx.Primary.SearchCalls, fx.Fallback.SearchCalls);
+
+        var resp = await api.PostAsJsonAsync("/places/resolve", new ResolvePlaceRequest { Text = "Shibuya Crossing" });
+        resp.EnsureSuccessStatusCode();
+        var resolved = (await resp.Content.ReadFromJsonAsync<ResolvePlaceResponse>())!;
+        Assert.Equal(35.6595, resolved.Latitude!.Value, 4);
+        Assert.Equal(p0 + 1, fx.Primary.SearchCalls);   // primary tried (empty)…
+        Assert.Equal(f0 + 1, fx.Fallback.SearchCalls);  // …fallback answered
+
+        var got = (await api.GetFromJsonAsync<PlaceDto>($"/places/{resolved.PlaceId}"))!;
+        Assert.Equal(PlaceSource.Geocoded, got.Source);
+        Assert.Contains(got.Containment, a => a.Name == "Japan");
+
+        // The OSM external id from the fallback hit reconciles.
+        var byExt = (await api.GetFromJsonAsync<PlaceDto>("/places/by-external/Osm/node/123456"))!;
+        Assert.Equal(resolved.PlaceId, byExt.Id);
+
+        // Frozen: the same query serves from the cache — no new outbound calls to either endpoint.
+        var fwd = (await api.GetFromJsonAsync<List<GeocodeResultDto>>("/geocode/forward?q=Shibuya%20Crossing"))!;
+        Assert.Single(fwd);
+        Assert.Equal(p0 + 1, fx.Primary.SearchCalls);
+        Assert.Equal(f0 + 1, fx.Fallback.SearchCalls);
+    }
+
+    [Fact]
+    public async Task Reverse_falls_back_when_the_regional_instance_cannot_geocode()
+    {
+        var api = fx.Factory.ApiClient(Email);
+        var (p0, f0) = (fx.Primary.ReverseCalls, fx.Fallback.ReverseCalls);
+
+        var hit = (await api.GetFromJsonAsync<GeocodeResultDto>("/geocode/reverse?lat=35.6595&lon=139.7005"))!;
+        Assert.Contains("Shibuya", hit.DisplayName);
+        Assert.Equal(p0 + 1, fx.Primary.ReverseCalls);
+        Assert.Equal(f0 + 1, fx.Fallback.ReverseCalls);
+
+        var again = (await api.GetFromJsonAsync<GeocodeResultDto>("/geocode/reverse?lat=35.6595&lon=139.7005"))!;
+        Assert.Contains("Shibuya", again.DisplayName);
+        Assert.Equal(p0 + 1, fx.Primary.ReverseCalls);  // cache hit — no new calls
+        Assert.Equal(f0 + 1, fx.Fallback.ReverseCalls);
+    }
+}

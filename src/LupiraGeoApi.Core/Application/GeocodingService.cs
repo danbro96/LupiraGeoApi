@@ -2,8 +2,8 @@ using System.Globalization;
 using System.Text.Json;
 using LupiraGeoApi.Domain;
 using Marten;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace LupiraGeoApi.Application;
 
@@ -13,15 +13,27 @@ public sealed record GeocodeHit(
     string? CountryCode, string? Country, string? Region, string? Locality,
     string? OsmType, long? OsmId);
 
-/// <summary>Forward + reverse geocoding against a self-hosted Nominatim, resolve-once-and-freeze into a
-/// <see cref="GeocodeCache"/> keyed by a deterministic id (quantized grid for reverse, normalized query for forward).
-/// If <c>Nominatim:BaseUrl</c> is unset (or on any failure) it returns cache-only / empty — it never blocks a resolve
-/// and never calls an external service. Modelled on LupiraLocationApi's PlaceLabelService.</summary>
-public sealed class GeocodingService(IDocumentSession session, IConfiguration config, ILogger<GeocodingService> logger)
+/// <summary>Forward + reverse geocoding, resolve-once-and-freeze into a <see cref="GeocodeCache"/> keyed by a
+/// deterministic id (quantized grid for reverse, normalized query for forward). Tries the self-hosted regional
+/// Nominatim first; when it is unset or yields nothing, the public fallback (throttled via
+/// <see cref="NominatimRateGate"/>) gets one shot — whichever answers is frozen, so a foreign query costs one
+/// external call ever. Both unset (or any failure) ⇒ cache-only / empty; it never blocks a resolve.</summary>
+public sealed class GeocodingService(
+    IDocumentSession session, IHttpClientFactory httpFactory,
+    IOptions<NominatimOptions> options, ILogger<GeocodingService> logger)
 {
-    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(5) };
+    public const string PrimaryClientName = "nominatim";
+    public const string FallbackClientName = "nominatim-fallback";
 
-    private string? BaseUrl => config["Nominatim:BaseUrl"] is { Length: > 0 } b ? b.TrimEnd('/') : null;
+    private string? PrimaryUrl => Normalize(options.Value.BaseUrl);
+    private string? FallbackUrl => Normalize(options.Value.FallbackBaseUrl);
+
+    // An empty env var binds over the option's default — fall back to it rather than sending a blank UA.
+    private string UserAgent => string.IsNullOrWhiteSpace(options.Value.UserAgent)
+        ? new NominatimOptions().UserAgent
+        : options.Value.UserAgent;
+
+    private static string? Normalize(string? url) => url is { Length: > 0 } ? url.TrimEnd('/') : null;
 
     public async Task<GeocodeHit?> ReverseAsync(double lat, double lon, CancellationToken ct = default)
     {
@@ -32,16 +44,19 @@ public sealed class GeocodingService(IDocumentSession session, IConfiguration co
             return ParseHit(cdoc.RootElement);
         }
 
-        if (BaseUrl is null) return null;
         var (qlat, qlon) = GeocodeCache.Quantize(lat, lon);
-        var url = $"{BaseUrl}/reverse?format=jsonv2&addressdetails=1&lat={Fmt(qlat)}&lon={Fmt(qlon)}";
-        using var doc = await GetAsync(url, ct);
-        if (doc is null) return null;
-        var root = doc.RootElement;
-        if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("lat", out _)) return null;
+        var pathQuery = $"/reverse?format=jsonv2&addressdetails=1&lat={Fmt(qlat)}&lon={Fmt(qlon)}";
+        foreach (var (client, baseUrl) in Endpoints())
+        {
+            using var doc = await GetAsync(client, baseUrl + pathQuery, ct);
+            // A regional instance answers "Unable to geocode" (no lat) for out-of-coverage points — try the fallback.
+            if (doc is null || doc.RootElement.ValueKind != JsonValueKind.Object
+                            || !doc.RootElement.TryGetProperty("lat", out _)) continue;
 
-        await CacheAsync(id, "reverse", $"{qlat},{qlon}", root, ct);
-        return ParseHit(root);
+            await CacheAsync(id, "reverse", $"{qlat},{qlon}", doc.RootElement, ct);
+            return ParseHit(doc.RootElement);
+        }
+        return null;
     }
 
     public async Task<IReadOnlyList<GeocodeHit>> ForwardAsync(string query, int limit = 5, CancellationToken ct = default)
@@ -56,23 +71,48 @@ public sealed class GeocodingService(IDocumentSession session, IConfiguration co
             return ParseArray(cdoc.RootElement);
         }
 
-        if (BaseUrl is null) return [];
-        var url = $"{BaseUrl}/search?format=jsonv2&addressdetails=1&limit={limit}&q={Uri.EscapeDataString(query)}";
-        using var doc = await GetAsync(url, ct);
-        if (doc is null) return [];
-        var root = doc.RootElement;
+        var pathQuery = $"/search?format=jsonv2&addressdetails=1&limit={limit}&q={Uri.EscapeDataString(query)}";
+        JsonDocument? emptyResult = null;
+        try
+        {
+            foreach (var (client, baseUrl) in Endpoints())
+            {
+                var doc = await GetAsync(client, baseUrl + pathQuery, ct);
+                if (doc is null) continue;
+                var hits = ParseArray(doc.RootElement);
+                if (hits.Count > 0)
+                {
+                    await CacheAsync(id, "forward", query, doc.RootElement, ct);
+                    doc.Dispose();
+                    return hits;
+                }
+                emptyResult?.Dispose();
+                emptyResult = doc; // valid empty answer — freeze it only if no later endpoint does better
+            }
 
-        await CacheAsync(id, "forward", query, root, ct);
-        return ParseArray(root);
+            if (emptyResult is not null)
+                await CacheAsync(id, "forward", query, emptyResult.RootElement, ct);
+            return [];
+        }
+        finally
+        {
+            emptyResult?.Dispose();
+        }
     }
 
-    private async Task<JsonDocument?> GetAsync(string url, CancellationToken ct)
+    private IEnumerable<(string Client, string BaseUrl)> Endpoints()
+    {
+        if (PrimaryUrl is { } p) yield return (PrimaryClientName, p);
+        if (FallbackUrl is { } f) yield return (FallbackClientName, f);
+    }
+
+    private async Task<JsonDocument?> GetAsync(string clientName, string url, CancellationToken ct)
     {
         try
         {
             using var req = new HttpRequestMessage(HttpMethod.Get, url);
-            req.Headers.UserAgent.ParseAdd("LupiraGeoApi/1.0");
-            using var resp = await Http.SendAsync(req, ct);
+            req.Headers.UserAgent.ParseAdd(UserAgent);
+            using var resp = await httpFactory.CreateClient(clientName).SendAsync(req, ct);
             if (!resp.IsSuccessStatusCode) return null;
             return JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct));
         }

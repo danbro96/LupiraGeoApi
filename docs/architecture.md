@@ -56,6 +56,7 @@ classDiagram
         +string? FormattedAddress
         +PlaceSource Source
         +bool Verified
+        +Guid? MergedIntoId  «tombstone redirect»
     }
     class PlaceAlias { <<EF>> +Guid Id +Guid PlaceId +string Name +string? Lang }
     class PlaceExternalId { <<EF>> +Guid Id +Guid PlaceId +ExternalScheme Scheme +string Value }
@@ -92,16 +93,36 @@ classDiagram
 ## Resolving free-text → a place
 
 `POST /places/resolve` (and the `PlaceResolver`) replaces the old exact-string dedup: (1) match an existing place by
-case-insensitive name; (2) else forward-geocode via Nominatim and, if coordinates come back, dedupe by name+proximity
-(~60 m) or create a `Geocoded` place with coordinates + an on-demand `AdminArea` chain; (3) else provisionally create
-an unverified `User` place with no coordinates. Geocoding is optional — with `Nominatim:BaseUrl` unset it never calls
-out and step 3 always applies.
+case-insensitive name **or alias**; (2) else forward-geocode via Nominatim and, if coordinates come back, dedupe by
+name+proximity (~60 m) or create a `Geocoded` place with coordinates + an on-demand `AdminArea` chain; (3) else
+provisionally create an unverified `User` place with no coordinates. Geocoding is optional — with no Nominatim URL
+configured it never calls out and step 3 always applies. `POST /places/resolve:batch` runs the same pipeline over up
+to 50 texts, responses aligned index-for-index.
+
+## Typeahead
+
+`GET /places/suggest` is the UI typeahead: trigram `word_similarity` (pg_trgm GIN indexes exist on place names,
+aliases, and area names) over places **and** `AdminArea` localities, merged and ranked, discriminated by a
+`type` field — cities suggest straight from the GeoNames seed without a gazetteer entry.
+
+## Curation: aliases, merge, verify
+
+Aliases (`POST/DELETE /places/{id}/aliases…`) carry alternate names; resolve and suggest match them. Duplicates are
+merged (`POST /places/{id}/merge` → `intoPlaceId`) with a **tombstone redirect**: the loser keeps its row with
+`MergedIntoId` set, so place ids held by other services (cal) keep resolving — reads by id follow the chain, every
+search excludes tombstones. Names move over as aliases, external ids move (unique `(Scheme,Value)` respected), the
+survivor's missing fields fill in from the loser, and saved places re-point (EF commits first, then Marten — two
+commits, not atomic; re-running the same merge converges). Verify stays a plain `PATCH` (`verified: true`).
 
 ## Geocoding & the cache
 
-`GeocodingService` does forward (`/search`) and reverse (`/reverse`) against a self-hosted Nominatim, resolve-once-and-
-freeze into `GeocodeCache` — reverse keyed by a ~100 m quantized grid cell, forward by the normalized query, both via a
-deterministic id so retries upsert. Any failure or unset base URL returns empty/null and never blocks a resolve.
+`GeocodingService` does forward (`/search`) and reverse (`/reverse`) geocoding, resolve-once-and-freeze into
+`GeocodeCache` — reverse keyed by a ~100 m quantized grid cell, forward by the normalized query, both via a
+deterministic id so retries upsert. Two endpoints, tried in order (`NominatimOptions`): the self-hosted regional
+instance (`Nominatim:BaseUrl`), then an optional public fallback (`Nominatim:FallbackBaseUrl`) for queries outside the
+regional extract's coverage — throttled through `NominatimRateGate` (singleton, ≥1.1 s between requests, per the
+public usage policy) with an identifying `Nominatim:UserAgent`. Whichever endpoint answers is frozen, so a foreign
+query costs one public call ever. Any failure or no configured URL returns empty/null and never blocks a resolve.
 
 ## Reference-data seed
 
