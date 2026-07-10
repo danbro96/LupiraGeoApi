@@ -49,6 +49,17 @@ var authBuilder = builder.Services.AddAuthentication(JwtBearerDefaults.Authentic
         options.Authority = builder.Configuration["Auth:Authority"];
         options.Audience = builder.Configuration["Auth:Audience"];
         options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
+        options.Events = new JwtBearerEvents
+        {
+            // MCP auth spec: a 401 on /mcp advertises the RFC 9728 metadata so clients can discover the issuer.
+            OnChallenge = ctx =>
+            {
+                if (ctx.Request.Path.StartsWithSegments("/mcp"))
+                    ctx.Response.Headers.Append("WWW-Authenticate",
+                        $"Bearer resource_metadata=\"{McpResourceMetadata.ResourceMetadataUrl(ctx.Request)}\"");
+                return Task.CompletedTask;
+            },
+        };
     });
 
 // Development-only: allow X-Dev-User header auth so the API can be exercised without Authentik.
@@ -194,6 +205,8 @@ app.MapAdminAreas();
 app.MapSavedPlaces();
 
 // Agent MCP transport (LAN/WireGuard-only; excluded from the Cloudflare Tunnel at the edge).
+// RFC 9728 metadata lets MCP clients discover the Authentik issuer from the 401 challenge.
+app.MapMcpResourceMetadata(app.Configuration["Auth:Authority"]);
 app.MapMcp("/mcp").RequireAuthorization("ApiPolicy");
 
 app.Run();
