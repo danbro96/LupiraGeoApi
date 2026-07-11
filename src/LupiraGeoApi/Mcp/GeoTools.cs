@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using LupiraGeoApi.Application;
 using LupiraGeoApi.Auth;
+using LupiraGeoApi.Domain;
 using LupiraGeoApi.Dtos.Geocoding;
 using LupiraGeoApi.Dtos.Places;
 using LupiraGeoApi.Dtos.SavedPlaces;
@@ -10,8 +11,9 @@ using ModelContextProtocol.Server;
 
 namespace LupiraGeoApi.Mcp;
 
-/// <summary>Read-only geo tools for the agent — the same Core services the REST handlers use, scoped to the caller.
-/// No mutations; no raw dumps beyond the gazetteer surface.</summary>
+/// <summary>Geo tools for the agent — the same Core services the REST handlers use, scoped to the caller. Reads cover
+/// search/lookup/reverse-geocode; writes cover the import + curation path (forward-geocode, resolve, create, save,
+/// alias, curate). LAN/WireGuard-only (see <see cref="LupiraGeoApi.Endpoints.McpExposure"/>), so no public write surface.</summary>
 [McpServerToolType]
 public sealed class GeoTools(CurrentUser user, PlaceQueryService places, GeocodingService geocoder, SavedPlaceService saved)
 {
@@ -34,11 +36,95 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         [Description("Latitude.")] double lat, [Description("Longitude.")] double lon, CancellationToken ct = default) =>
         (await geocoder.ReverseAsync(lat, lon, ct))?.ToDto();
 
+    [McpServerTool(Name = "forward_geocode"), Description("Resolve free text (address/place) to candidate coordinates + structured address. Does NOT persist a place — use for private homes you want to keep out of the shared gazetteer (feed the coordinate to save_place).")]
+    public async Task<List<GeocodeResultDto>> ForwardGeocode(
+        [Description("Text to geocode (e.g. a street address).")] string q,
+        [Description("Max candidates (default 5).")] int? limit = null,
+        CancellationToken ct = default) =>
+        (await geocoder.ForwardAsync(q, limit ?? 5, ct)).Select(h => h.ToDto()).ToList();
+
     [McpServerTool(Name = "list_saved_places"), Description("List the caller's saved places / personal labels.")]
     public async Task<List<SavedPlaceDto>> ListSavedPlaces(CancellationToken ct = default)
     {
         var u = await user.GetAsync(ct);
         return Require(await saved.ListAsync(u.Id, ct));
+    }
+
+    [McpServerTool(Name = "resolve_place"), Description("Resolve free text to a gazetteer place id — matches an existing entry, else forward-geocodes and creates one, else provisionally creates an unverified place with no coordinates. Use for shared POIs (schools, workplaces, parks).")]
+    public async Task<ResolvePlaceResponse> ResolvePlace(
+        [Description("Free-text place/address to resolve.")] string text, CancellationToken ct = default)
+    {
+        var u = await user.GetAsync(ct);
+        return Require(await places.ResolveAsync(text, u.Id, ct));
+    }
+
+    [McpServerTool(Name = "resolve_places"), Description("Bulk resolve (max 50 texts) for imports; responses align index-for-index with the input. All-or-nothing on an invalid item.")]
+    public async Task<List<ResolvePlaceResponse>> ResolvePlaces(
+        [Description("Texts to resolve (max 50).")] List<string> texts, CancellationToken ct = default)
+    {
+        var u = await user.GetAsync(ct);
+        return Require(await places.ResolveBatchAsync(texts, u.Id, ct));
+    }
+
+    [McpServerTool(Name = "create_place"), Description("Create a gazetteer place directly with a known name/category and optional coordinates. Prefer when you already know the semantics (e.g. a school); use resolve_place when you only have free text.")]
+    public async Task<PlaceDto> CreatePlace(
+        [Description("Canonical place name.")] string name,
+        [Description("Poi (a named venue) or Address.")] PlaceKind kind = PlaceKind.Poi,
+        [Description("Semantic category (Home/Office/School/…).")] PlaceCategory category = PlaceCategory.Unknown,
+        [Description("Latitude (optional; omit for a coordinate-less provisional place).")] double? latitude = null,
+        [Description("Longitude (optional).")] double? longitude = null,
+        [Description("Formatted address (optional).")] string? formattedAddress = null,
+        [Description("Containing AdminArea id (optional).")] Guid? withinAreaId = null,
+        CancellationToken ct = default)
+    {
+        var u = await user.GetAsync(ct);
+        return Require(await places.CreateAsync(new CreatePlaceRequest
+        {
+            Name = name, Kind = kind, Category = category,
+            Latitude = latitude, Longitude = longitude,
+            FormattedAddress = formattedAddress, WithinAreaId = withinAreaId,
+        }, u.Id, ct));
+    }
+
+    [McpServerTool(Name = "update_place"), Description("Curate a place: rename, recategorize, or verify. Omitted fields are left unchanged.")]
+    public async Task<PlaceDto> UpdatePlace(
+        [Description("Place id.")] Guid id,
+        [Description("New canonical name (optional).")] string? name = null,
+        [Description("New category (optional).")] PlaceCategory? category = null,
+        [Description("Verified flag (optional).")] bool? verified = null,
+        CancellationToken ct = default)
+    {
+        var u = await user.GetAsync(ct);
+        return Require(await places.UpdateAsync(id, new UpdatePlaceRequest { Name = name, Category = category, Verified = verified }, u.Id, ct));
+    }
+
+    [McpServerTool(Name = "add_place_alias"), Description("Add an alternate name (optional language tag) to a place — a translation, colloquialism, or former name.")]
+    public async Task<PlaceDto> AddPlaceAlias(
+        [Description("Place id.")] Guid id,
+        [Description("Alternate name.")] string name,
+        [Description("BCP-47 language tag (optional, e.g. 'sv').")] string? lang = null,
+        CancellationToken ct = default)
+    {
+        var u = await user.GetAsync(ct);
+        return Require(await places.AddAliasAsync(id, new AddAliasRequest { Name = name, Lang = lang }, u.Id, ct));
+    }
+
+    [McpServerTool(Name = "save_place"), Description("Save a personal label (private, owner-scoped) over a gazetteer place id, or over a raw coordinate. This is where 'Home', 'Work', family homes live — not the shared catalog.")]
+    public async Task<SavedPlaceDto> SavePlace(
+        [Description("Personal label, e.g. 'Home' or 'Mormor & morfar'.")] string label,
+        [Description("Gazetteer place id to label (optional if lat/lon given).")] Guid? placeId = null,
+        [Description("Raw latitude (optional; use for a private home kept out of the gazetteer).")] double? latitude = null,
+        [Description("Raw longitude (optional).")] double? longitude = null,
+        [Description("Icon hint (optional).")] string? icon = null,
+        [Description("Mark as favorite (default false).")] bool isFavorite = false,
+        CancellationToken ct = default)
+    {
+        var u = await user.GetAsync(ct);
+        return Require(await saved.CreateAsync(u.Id, new CreateSavedPlaceRequest
+        {
+            Label = label, PlaceId = placeId, Latitude = latitude, Longitude = longitude,
+            Icon = icon, IsFavorite = isFavorite,
+        }, ct));
     }
 
     private static T Require<T>(OpResult<T> r) => r.Status switch

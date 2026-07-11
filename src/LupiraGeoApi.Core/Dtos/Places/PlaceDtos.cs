@@ -66,7 +66,7 @@ public sealed class PlaceSuggestionDto
     public string? Context { get; set; }
 }
 
-/// <summary>Create a user place directly (name + optional coordinates/category). The missing write path today.</summary>
+/// <summary>Create a user place directly (name + optional coordinates/category).</summary>
 public sealed class CreatePlaceRequest
 {
     public required string Name { get; set; }
