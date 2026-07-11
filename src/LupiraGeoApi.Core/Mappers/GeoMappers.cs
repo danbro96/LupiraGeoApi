@@ -47,6 +47,7 @@ public static class GeoMappers
         Longitude = s.RawLon,
         Label = s.Label,
         Icon = s.Icon,
+        Notes = s.Notes,
         IsFavorite = s.IsFavorite,
     };
 

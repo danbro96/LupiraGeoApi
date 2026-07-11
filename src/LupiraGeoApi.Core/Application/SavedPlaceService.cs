@@ -35,6 +35,7 @@ public sealed class SavedPlaceService(IDocumentSession session)
             RawLon = r.Longitude,
             Label = r.Label.Trim(),
             Icon = r.Icon,
+            Notes = string.IsNullOrWhiteSpace(r.Notes) ? null : r.Notes.Trim(),
             IsFavorite = r.IsFavorite,
             CreatedAt = now,
             UpdatedAt = now,
@@ -54,6 +55,7 @@ public sealed class SavedPlaceService(IDocumentSession session)
             saved.Label = label.Trim();
         }
         if (r.Icon is not null) saved.Icon = r.Icon;
+        if (r.Notes is not null) saved.Notes = string.IsNullOrWhiteSpace(r.Notes) ? null : r.Notes.Trim();
         if (r.IsFavorite is { } fav) saved.IsFavorite = fav;
         saved.UpdatedAt = DateTimeOffset.UtcNow;
         session.Store(saved);

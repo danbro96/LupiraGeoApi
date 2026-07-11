@@ -116,6 +116,7 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         [Description("Raw latitude (optional; use for a private home kept out of the gazetteer).")] double? latitude = null,
         [Description("Raw longitude (optional).")] double? longitude = null,
         [Description("Icon hint (optional).")] string? icon = null,
+        [Description("Free-text note (optional), e.g. 'longest childhood home'.")] string? notes = null,
         [Description("Mark as favorite (default false).")] bool isFavorite = false,
         CancellationToken ct = default)
     {
@@ -123,7 +124,7 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         return Require(await saved.CreateAsync(u.Id, new CreateSavedPlaceRequest
         {
             Label = label, PlaceId = placeId, Latitude = latitude, Longitude = longitude,
-            Icon = icon, IsFavorite = isFavorite,
+            Icon = icon, Notes = notes, IsFavorite = isFavorite,
         }, ct));
     }
 

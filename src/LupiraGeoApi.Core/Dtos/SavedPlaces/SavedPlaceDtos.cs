@@ -9,6 +9,7 @@ public sealed class SavedPlaceDto
     public double? Longitude { get; set; }
     public required string Label { get; set; }
     public string? Icon { get; set; }
+    public string? Notes { get; set; }
     public required bool IsFavorite { get; set; }
 }
 
@@ -19,6 +20,7 @@ public sealed class CreateSavedPlaceRequest
     public double? Latitude { get; set; }
     public double? Longitude { get; set; }
     public string? Icon { get; set; }
+    public string? Notes { get; set; }
     public bool IsFavorite { get; set; }
 }
 
@@ -27,5 +29,6 @@ public sealed class UpdateSavedPlaceRequest
 {
     public string? Label { get; set; }
     public string? Icon { get; set; }
+    public string? Notes { get; set; }
     public bool? IsFavorite { get; set; }
 }
