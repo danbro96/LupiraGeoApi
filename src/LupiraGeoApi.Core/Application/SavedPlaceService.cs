@@ -2,6 +2,7 @@ using LupiraGeoApi.Domain;
 using LupiraGeoApi.Dtos.SavedPlaces;
 using LupiraGeoApi.Mappers;
 using Marten;
+using JasperFx; // ConcurrencyException moved here in Marten 9 (JasperFx core).
 
 namespace LupiraGeoApi.Application;
 
@@ -24,6 +25,7 @@ public sealed class SavedPlaceService(IDocumentSession session)
         if (r.PlaceId is null && r is not { Latitude: not null, Longitude: not null })
             return OpResult<SavedPlaceDto>.Invalid("A saved place needs either a placeId or a latitude/longitude.");
 
+        var now = DateTimeOffset.UtcNow;
         var saved = new SavedPlace
         {
             Id = Guid.NewGuid(),
@@ -34,7 +36,8 @@ public sealed class SavedPlaceService(IDocumentSession session)
             Label = r.Label.Trim(),
             Icon = r.Icon,
             IsFavorite = r.IsFavorite,
-            CreatedAt = DateTimeOffset.UtcNow,
+            CreatedAt = now,
+            UpdatedAt = now,
         };
         session.Store(saved);
         await session.SaveChangesAsync(ct);
@@ -52,8 +55,11 @@ public sealed class SavedPlaceService(IDocumentSession session)
         }
         if (r.Icon is not null) saved.Icon = r.Icon;
         if (r.IsFavorite is { } fav) saved.IsFavorite = fav;
+        saved.UpdatedAt = DateTimeOffset.UtcNow;
         session.Store(saved);
-        await session.SaveChangesAsync(ct);
+        // Optimistic concurrency: another device modifying this doc between our load and save throws.
+        try { await session.SaveChangesAsync(ct); }
+        catch (ConcurrencyException) { return OpResult<SavedPlaceDto>.Conflict("Saved place was modified concurrently; reload and retry."); }
         return OpResult<SavedPlaceDto>.Ok(saved.ToDto());
     }
 

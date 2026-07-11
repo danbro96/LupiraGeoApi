@@ -17,6 +17,7 @@ public sealed class GeoDbContext(DbContextOptions<GeoDbContext> options) : DbCon
     public DbSet<PlaceAlias> PlaceAliases => Set<PlaceAlias>();
     public DbSet<PlaceExternalId> PlaceExternalIds => Set<PlaceExternalId>();
     public DbSet<AdminArea> AdminAreas => Set<AdminArea>();
+    public DbSet<CurationEvent> CurationLog => Set<CurationEvent>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -81,6 +82,16 @@ public sealed class GeoDbContext(DbContextOptions<GeoDbContext> options) : DbCon
 
             e.HasOne(a => a.WithinArea).WithMany()
                 .HasForeignKey(a => a.WithinAreaId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<CurationEvent>(e =>
+        {
+            e.HasKey(x => x.Seq);
+            e.Property(x => x.Seq).ValueGeneratedOnAdd();
+            e.Property(x => x.Action).HasConversion<string>().IsRequired();
+            // No FK to Place: the log is append-only and outlives the entity's current shape (event-store mindset).
+            e.HasIndex(x => x.PlaceId);
+            e.HasIndex(x => x.At);
         });
     }
 }

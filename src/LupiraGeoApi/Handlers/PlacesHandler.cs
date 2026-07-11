@@ -31,20 +31,32 @@ public sealed class PlacesHandler(PlaceQueryService places, PlaceMergeService me
         return OpResultMap.OkProblem(await places.CreateAsync(r, u.Id, ct));
     }
 
-    public async Task<Results<Ok<PlaceDto>, NotFound, ProblemHttpResult, UnauthorizedHttpResult>> UpdateAsync(Guid id, UpdatePlaceRequest r, CancellationToken ct) =>
-        OpResultMap.OkNotFoundProblem(await places.UpdateAsync(id, r, ct));
+    public async Task<Results<Ok<PlaceDto>, NotFound, ProblemHttpResult, UnauthorizedHttpResult>> UpdateAsync(Guid id, UpdatePlaceRequest r, CancellationToken ct)
+    {
+        var u = await user.GetAsync(ct);
+        return OpResultMap.OkNotFoundProblem(await places.UpdateAsync(id, r, u.Id, ct));
+    }
 
     public async Task<Results<Ok<PlaceDto>, NotFound, ProblemHttpResult, UnauthorizedHttpResult>> AddAliasAsync(
-        Guid id, AddAliasRequest r, CancellationToken ct) =>
-        OpResultMap.OkNotFoundProblem(await places.AddAliasAsync(id, r, ct));
+        Guid id, AddAliasRequest r, CancellationToken ct)
+    {
+        var u = await user.GetAsync(ct);
+        return OpResultMap.OkNotFoundProblem(await places.AddAliasAsync(id, r, u.Id, ct));
+    }
 
     public async Task<Results<NoContent, NotFound, ProblemHttpResult, UnauthorizedHttpResult>> RemoveAliasAsync(
-        Guid id, Guid aliasId, CancellationToken ct) =>
-        OpResultMap.NoContentNotFoundProblem(await places.RemoveAliasAsync(id, aliasId, ct));
+        Guid id, Guid aliasId, CancellationToken ct)
+    {
+        var u = await user.GetAsync(ct);
+        return OpResultMap.NoContentNotFoundProblem(await places.RemoveAliasAsync(id, aliasId, u.Id, ct));
+    }
 
     public async Task<Results<Ok<PlaceDto>, NotFound, ProblemHttpResult, UnauthorizedHttpResult>> MergeAsync(
-        Guid id, MergePlaceRequest r, CancellationToken ct) =>
-        OpResultMap.OkNotFoundProblem(await merges.MergeAsync(id, r.IntoPlaceId, ct));
+        Guid id, MergePlaceRequest r, CancellationToken ct)
+    {
+        var u = await user.GetAsync(ct);
+        return OpResultMap.OkNotFoundProblem(await merges.MergeAsync(id, r.IntoPlaceId, u.Id, ct));
+    }
 
     public async Task<Results<Ok<ResolvePlaceResponse>, ProblemHttpResult, UnauthorizedHttpResult>> ResolveAsync(ResolvePlaceRequest r, CancellationToken ct)
     {

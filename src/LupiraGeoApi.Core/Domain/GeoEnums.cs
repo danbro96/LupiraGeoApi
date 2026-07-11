@@ -22,3 +22,7 @@ public enum AdminLevel { Country, Region, Locality }
 
 /// <summary>What a typeahead suggestion points at: a gazetteer <see cref="Place"/> or an <see cref="AdminArea"/> locality.</summary>
 public enum SuggestionType { Place, Locality }
+
+/// <summary>A curation decision recorded on a <see cref="Place"/> in the append-only <c>curation_log</c>. Stable names —
+/// they are the future event-type names, so never rename a member (add new ones; keep old ones readable).</summary>
+public enum CurationAction { Created, Verified, Unverified, Renamed, Recategorized, AliasAdded, AliasRemoved, Merged }

@@ -19,4 +19,5 @@ public sealed class SavedPlace
     public string? Icon { get; set; }
     public bool IsFavorite { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
 }

@@ -13,7 +13,7 @@ namespace LupiraGeoApi.Application;
 // Marten's namespace stays un-imported: its LINQ extensions collide with EF's on the shared IQueryable surface.
 public sealed class PlaceMergeService(GeoDbContext db, Marten.IDocumentSession session)
 {
-    public async Task<OpResult<PlaceDto>> MergeAsync(Guid id, Guid intoPlaceId, CancellationToken ct = default)
+    public async Task<OpResult<PlaceDto>> MergeAsync(Guid id, Guid intoPlaceId, Guid actorId, CancellationToken ct = default)
     {
         var loser = await LoadAsync(id, ct);
         if (loser is null) return OpResult<PlaceDto>.NotFound();
@@ -62,6 +62,7 @@ public sealed class PlaceMergeService(GeoDbContext db, Marten.IDocumentSession s
         winner.Verified |= loser.Verified;
 
         loser.MergedIntoId = winner.Id;
+        db.Record(loser.Id, CurationAction.Merged, actorId, relatedPlaceId: winner.Id);
         await db.SaveChangesAsync(ct);
 
         var savedPlaces = await Marten.QueryableExtensions.ToListAsync(

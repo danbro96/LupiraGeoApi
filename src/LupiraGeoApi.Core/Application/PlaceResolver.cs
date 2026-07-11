@@ -57,6 +57,7 @@ public sealed class PlaceResolver(GeoDbContext db, GeocodingService geocoder)
             if (hit is { OsmType: { } t, OsmId: { } oid })
                 place.ExternalIds.Add(new PlaceExternalId { Id = Guid.NewGuid(), PlaceId = place.Id, Scheme = ExternalScheme.Osm, Value = $"{t}/{oid}" });
             db.Places.Add(place);
+            db.Record(place.Id, CurationAction.Created, createdBy, detail: place.CanonicalName);
             await db.SaveChangesAsync(ct);
             return place;
         }
@@ -74,6 +75,7 @@ public sealed class PlaceResolver(GeoDbContext db, GeocodingService geocoder)
             CreatedAt = DateTimeOffset.UtcNow,
         };
         db.Places.Add(provisional);
+        db.Record(provisional.Id, CurationAction.Created, createdBy, detail: provisional.CanonicalName);
         await db.SaveChangesAsync(ct);
         return provisional;
     }

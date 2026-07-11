@@ -166,21 +166,35 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver)
             CreatedAt = DateTimeOffset.UtcNow,
         };
         db.Places.Add(place);
+        db.Record(place.Id, CurationAction.Created, createdBy, detail: place.CanonicalName);
         await db.SaveChangesAsync(ct);
         return OpResult<PlaceDto>.Ok(place.ToDto());
     }
 
-    public async Task<OpResult<PlaceDto>> UpdateAsync(Guid id, UpdatePlaceRequest r, CancellationToken ct = default)
+    public async Task<OpResult<PlaceDto>> UpdateAsync(Guid id, UpdatePlaceRequest r, Guid actorId, CancellationToken ct = default)
     {
         var place = await db.Places.Include(p => p.Aliases).Include(p => p.ExternalIds).FirstOrDefaultAsync(p => p.Id == id, ct);
         if (place is null) return OpResult<PlaceDto>.NotFound();
         if (r.Name is { } name)
         {
             if (string.IsNullOrWhiteSpace(name)) return OpResult<PlaceDto>.Invalid("Name cannot be blank.");
-            place.CanonicalName = name.Trim();
+            name = name.Trim();
+            if (!string.Equals(place.CanonicalName, name, StringComparison.Ordinal))
+            {
+                place.CanonicalName = name;
+                db.Record(place.Id, CurationAction.Renamed, actorId, detail: name);
+            }
         }
-        if (r.Category is { } cat) place.Category = cat;
-        if (r.Verified is { } v) place.Verified = v;
+        if (r.Category is { } cat && cat != place.Category)
+        {
+            place.Category = cat;
+            db.Record(place.Id, CurationAction.Recategorized, actorId, detail: cat.ToString());
+        }
+        if (r.Verified is { } v && v != place.Verified)
+        {
+            place.Verified = v;
+            db.Record(place.Id, v ? CurationAction.Verified : CurationAction.Unverified, actorId);
+        }
         await db.SaveChangesAsync(ct);
 
         var dto = place.ToDto();
@@ -188,7 +202,7 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver)
         return OpResult<PlaceDto>.Ok(dto);
     }
 
-    public async Task<OpResult<PlaceDto>> AddAliasAsync(Guid placeId, AddAliasRequest r, CancellationToken ct = default)
+    public async Task<OpResult<PlaceDto>> AddAliasAsync(Guid placeId, AddAliasRequest r, Guid actorId, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(r.Name)) return OpResult<PlaceDto>.Invalid("Name is required.");
         var name = r.Name.Trim();
@@ -210,6 +224,7 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver)
             Name = name,
             Lang = string.IsNullOrWhiteSpace(r.Lang) ? null : r.Lang.Trim(),
         });
+        db.Record(place.Id, CurationAction.AliasAdded, actorId, detail: name);
         await db.SaveChangesAsync(ct);
 
         var dto = place.ToDto();
@@ -217,11 +232,12 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver)
         return OpResult<PlaceDto>.Ok(dto);
     }
 
-    public async Task<OpResult> RemoveAliasAsync(Guid placeId, Guid aliasId, CancellationToken ct = default)
+    public async Task<OpResult> RemoveAliasAsync(Guid placeId, Guid aliasId, Guid actorId, CancellationToken ct = default)
     {
         var alias = await db.PlaceAliases.FirstOrDefaultAsync(a => a.Id == aliasId && a.PlaceId == placeId, ct);
         if (alias is null) return OpResult.NotFound();
         db.PlaceAliases.Remove(alias);
+        db.Record(placeId, CurationAction.AliasRemoved, actorId, detail: alias.Name);
         await db.SaveChangesAsync(ct);
         return OpResult.Ok();
     }

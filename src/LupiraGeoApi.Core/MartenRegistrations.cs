@@ -16,7 +16,8 @@ public static class MartenRegistrations
         opts.UseSystemTextJsonForSerialization(EnumStorage.AsString);
 
         opts.Schema.For<Principal>().Index(x => x.AuthentikSub).Index(x => x.Email);
-        opts.Schema.For<SavedPlace>().Index(x => x.PrincipalId).Index(x => x.PlaceId);
+        // Optimistic concurrency: a concurrent edit (e.g. two devices) between load and save throws ConcurrencyException.
+        opts.Schema.For<SavedPlace>().Index(x => x.PrincipalId).Index(x => x.PlaceId).UseOptimisticConcurrency(true);
         opts.Schema.For<GeocodeCache>();
 
         return opts;

@@ -27,9 +27,9 @@ HTTP ─▶ Endpoints/ ─▶ Handlers/ ─▶ Core: Application services ─▶
 Same database (`lupira_geo`), two disjoint schemas — the LupiraCommsApi pattern (EF + Marten side by side):
 
 - **`geo` (EF Core + NetTopologySuite).** The gazetteer + reference data: `Place` (with a real
-  `geography(Point,4326)` column + GiST), `PlaceAlias`, `PlaceExternalId`, and the `AdminArea` containment tree.
-  Spatial and reference-shaped, so it is relational (not event-sourced), applied via **EF migrations** — never auto
-  against the live DB, only via the `--apply-schema` one-shot.
+  `geography(Point,4326)` column + GiST), `PlaceAlias`, `PlaceExternalId`, the `AdminArea` containment tree, and the
+  append-only `CurationEvent` log. Spatial and reference-shaped, so it is relational (not event-sourced), applied via
+  **EF migrations** — never auto against the live DB, only via the `--apply-schema` one-shot.
 - **`geo_user` (Marten documents).** Per-principal state + caches: `Principal` (JIT-provisioned identity),
   `SavedPlace`, and the `GeocodeCache`. Plain document store (`UseLightweightSessions`), no event sourcing.
 
@@ -82,12 +82,22 @@ classDiagram
     }
     class GeocodeCache { <<Marten · geo_user>> +Guid Id +string Kind +string Key +string Payload }
     class Principal { <<Marten · geo_user>> +Guid Id +string AuthentikSub +string Email }
+    class CurationEvent {
+        <<EF · geo · append-only>>
+        +long Seq
+        +Guid PlaceId
+        +CurationAction Action
+        +Guid? ActorPrincipalId
+        +DateTimeOffset At
+        +Guid? RelatedPlaceId
+    }
     Place --> AdminArea : WithinAreaId
     Place "1" *-- "*" PlaceAlias
     Place "1" *-- "*" PlaceExternalId
     AdminArea --> AdminArea : WithinAreaId
     SavedPlace ..> Place
     SavedPlace --> Principal
+    CurationEvent ..> Place : PlaceId (no FK)
 ```
 
 ## Resolving free-text → a place
@@ -113,6 +123,12 @@ merged (`POST /places/{id}/merge` → `intoPlaceId`) with a **tombstone redirect
 search excludes tombstones. Names move over as aliases, external ids move (unique `(Scheme,Value)` respected), the
 survivor's missing fields fill in from the loser, and saved places re-point (EF commits first, then Marten — two
 commits, not atomic; re-running the same merge converges). Verify stays a plain `PATCH` (`verified: true`).
+
+Every curation decision (create/verify/rename/recategorize/alias±/merge) appends a `CurationEvent` in the **same
+transaction** as the change — an unbackfillable actor+timestamp trail, and the replay seed if curation is ever
+event-sourced. `SavedPlace` uses Marten optimistic concurrency (`409` on a concurrent edit). Neither the gazetteer nor
+the cache is event-sourced, by design — see [event-sourcing.md](event-sourcing.md) for the decision and the
+conventions any future event stream must follow.
 
 ## Geocoding & the cache
 
