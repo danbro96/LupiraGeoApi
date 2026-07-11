@@ -71,6 +71,26 @@ public sealed class GeocodingFallbackTests(GeocodingFixture fx) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Regeocode_heals_a_coordinate_less_place()
+    {
+        var api = fx.Factory.ApiClient(Email);
+        // A user place with no coordinates — what resolve leaves behind on a geocoder miss.
+        var created = (await (await api.PostAsJsonAsync("/places", new CreatePlaceRequest { Name = "Shibuya Crossing" }))
+            .Content.ReadFromJsonAsync<PlaceDto>())!;
+        Assert.Null(created.Latitude);
+        Assert.Equal(PlaceSource.User, created.Source);
+
+        var resp = await api.PostAsync($"/places/{created.Id}/regeocode", null);
+        resp.EnsureSuccessStatusCode();
+        var healed = (await resp.Content.ReadFromJsonAsync<PlaceDto>())!;
+
+        Assert.Equal(PlaceSource.Geocoded, healed.Source);
+        Assert.Equal(35.6595, healed.Latitude!.Value, 4);
+        Assert.Contains(healed.Containment, a => a.Name == "Japan");
+        Assert.Contains(healed.ExternalIds, x => x.Scheme == ExternalScheme.Osm && x.Value == "node/123456");
+    }
+
+    [Fact]
     public async Task Reverse_falls_back_when_the_regional_instance_cannot_geocode()
     {
         var api = fx.Factory.ApiClient(Email);

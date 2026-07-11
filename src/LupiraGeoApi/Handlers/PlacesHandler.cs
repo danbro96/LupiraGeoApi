@@ -58,6 +58,18 @@ public sealed class PlacesHandler(PlaceQueryService places, PlaceMergeService me
         return OpResultMap.OkNotFoundProblem(await merges.MergeAsync(id, r.IntoPlaceId, u.Id, ct));
     }
 
+    public async Task<Results<Ok<PlaceDto>, NotFound, ProblemHttpResult, UnauthorizedHttpResult>> RegeocodeAsync(Guid id, CancellationToken ct)
+    {
+        var u = await user.GetAsync(ct);
+        return OpResultMap.OkNotFoundProblem(await places.RegeocodeAsync(id, u.Id, ct));
+    }
+
+    public async Task<Results<NoContent, NotFound, ProblemHttpResult, UnauthorizedHttpResult>> DeleteAsync(Guid id, CancellationToken ct)
+    {
+        var u = await user.GetAsync(ct);
+        return OpResultMap.NoContentNotFoundProblem(await places.DeleteAsync(id, u.Id, ct));
+    }
+
     public async Task<Results<Ok<ResolvePlaceResponse>, ProblemHttpResult, UnauthorizedHttpResult>> ResolveAsync(ResolvePlaceRequest r, CancellationToken ct)
     {
         var u = await user.GetAsync(ct);

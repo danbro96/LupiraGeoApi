@@ -59,6 +59,16 @@ public static class PlacesEndpoints
             .WithSummary("Merge a duplicate into the survivor (intoPlaceId): names become aliases, external ids and saved places move over, and the duplicate id keeps resolving via a tombstone redirect.")
             .Produces<PlaceDto>(StatusCodes.Status200OK).Produces(StatusCodes.Status404NotFound).ProducesProblem(StatusCodes.Status400BadRequest).ProducesProblem(StatusCodes.Status409Conflict).Produces(StatusCodes.Status401Unauthorized);
 
+        group.MapPost("/{id:guid}/regeocode", (Guid id, PlacesHandler h, CancellationToken ct) => h.RegeocodeAsync(id, ct))
+            .WithName("RegeocodePlace")
+            .WithSummary("Re-geocode a place from its address/name and attach coordinates, containment, and OSM id — heals a coordinate-less stub or refreshes a stale fix. 400 on a no-hit or transient geocoder outage; the place is left unchanged.")
+            .Produces<PlaceDto>(StatusCodes.Status200OK).Produces(StatusCodes.Status404NotFound).ProducesProblem(StatusCodes.Status400BadRequest).Produces(StatusCodes.Status401Unauthorized);
+
+        group.MapDelete("/{id:guid}", (Guid id, PlacesHandler h, CancellationToken ct) => h.DeleteAsync(id, ct))
+            .WithName("DeletePlace")
+            .WithSummary("Soft-delete a bad entry (e.g. a wrong geocode) with no valid survivor to merge into: tombstoned, so reads 404 and search/resolve exclude it, but the row stays for the audit trail. Idempotent.")
+            .Produces(StatusCodes.Status204NoContent).Produces(StatusCodes.Status404NotFound).Produces(StatusCodes.Status401Unauthorized);
+
         group.MapPost("/resolve", (ResolvePlaceRequest r, PlacesHandler h, CancellationToken ct) => h.ResolveAsync(r, ct))
             .WithName("ResolvePlace")
             .WithSummary("Resolve free-text to a place id — match an existing entry, geocode, or provisionally create. Used by upstream services (e.g. LupiraCalApi) to anchor a location string.")

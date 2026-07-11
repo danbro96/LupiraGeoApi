@@ -15,7 +15,7 @@ namespace LupiraGeoApi.Mcp;
 /// search/lookup/reverse-geocode; writes cover the import + curation path (forward-geocode, resolve, create, save,
 /// alias, curate). LAN/WireGuard-only (see <see cref="LupiraGeoApi.Endpoints.McpExposure"/>), so no public write surface.</summary>
 [McpServerToolType]
-public sealed class GeoTools(CurrentUser user, PlaceQueryService places, GeocodingService geocoder, SavedPlaceService saved)
+public sealed class GeoTools(CurrentUser user, PlaceQueryService places, GeocodingService geocoder, PlaceMergeService merges, SavedPlaceService saved)
 {
     [McpServerTool(Name = "find_places"), Description("Search the gazetteer by text and/or proximity; returns matching places with coordinates.")]
     public async Task<List<PlaceDto>> FindPlaces(
@@ -36,12 +36,12 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         [Description("Latitude.")] double lat, [Description("Longitude.")] double lon, CancellationToken ct = default) =>
         (await geocoder.ReverseAsync(lat, lon, ct))?.ToDto();
 
-    [McpServerTool(Name = "forward_geocode"), Description("Resolve free text (address/place) to candidate coordinates + structured address. Does NOT persist a place — use for private homes you want to keep out of the shared gazetteer (feed the coordinate to save_place).")]
+    [McpServerTool(Name = "forward_geocode"), Description("Resolve free text (address/place) to candidate coordinates + structured address. Does NOT persist a place — use for private homes you want to keep out of the shared gazetteer (feed the coordinate to save_place). Returns an empty list on both a genuine no-hit and a transient geocoder outage; retry an empty result before treating it as 'not found'.")]
     public async Task<List<GeocodeResultDto>> ForwardGeocode(
         [Description("Text to geocode (e.g. a street address).")] string q,
         [Description("Max candidates (default 5).")] int? limit = null,
         CancellationToken ct = default) =>
-        (await geocoder.ForwardAsync(q, limit ?? 5, ct)).Select(h => h.ToDto()).ToList();
+        (await geocoder.ForwardAsync(q, limit ?? 5, ct)).Hits.Select(h => h.ToDto()).ToList();
 
     [McpServerTool(Name = "list_saved_places"), Description("List the caller's saved places / personal labels.")]
     public async Task<List<SavedPlaceDto>> ListSavedPlaces(CancellationToken ct = default)
@@ -50,7 +50,7 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         return Require(await saved.ListAsync(u.Id, ct));
     }
 
-    [McpServerTool(Name = "resolve_place"), Description("Resolve free text to a gazetteer place id — matches an existing entry, else forward-geocodes and creates one, else provisionally creates an unverified place with no coordinates. Use for shared POIs (schools, workplaces, parks).")]
+    [McpServerTool(Name = "resolve_place"), Description("Resolve free text to a gazetteer place id — matches an existing entry, else forward-geocodes and creates one, else provisionally creates an unverified place with no coordinates. Use for shared POIs (schools, workplaces, parks). The 'resolution' field says which happened (Matched/Geocoded/Provisional/GeocodeUnavailable); GeocodeUnavailable means the geocoder was unreachable and NOTHING was created (placeId null) — retry it, don't treat it as not-found. Heal a Provisional stub later with regeocode_place.")]
     public async Task<ResolvePlaceResponse> ResolvePlace(
         [Description("Free-text place/address to resolve.")] string text, CancellationToken ct = default)
     {
@@ -58,7 +58,7 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         return Require(await places.ResolveAsync(text, u.Id, ct));
     }
 
-    [McpServerTool(Name = "resolve_places"), Description("Bulk resolve (max 50 texts) for imports; responses align index-for-index with the input. All-or-nothing on an invalid item.")]
+    [McpServerTool(Name = "resolve_places"), Description("Bulk resolve (max 50 texts) for imports; responses align index-for-index with the input. Aborts only on invalid input (blank text); a per-item geocoder outage comes back as resolution=GeocodeUnavailable (placeId null) so the batch still completes — re-run just those items, spaced out.")]
     public async Task<List<ResolvePlaceResponse>> ResolvePlaces(
         [Description("Texts to resolve (max 50).")] List<string> texts, CancellationToken ct = default)
     {
@@ -86,16 +86,49 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         }, u.Id, ct));
     }
 
-    [McpServerTool(Name = "update_place"), Description("Curate a place: rename, recategorize, or verify. Omitted fields are left unchanged.")]
+    [McpServerTool(Name = "update_place"), Description("Curate a place: rename, recategorize, verify, or correct its location by hand. Omitted fields are left unchanged. latitude+longitude (both together) move the point — use to fix a wrong geocode; pass withinAreaId to re-anchor its containment to match. To auto-heal a coordinate-less place from its address, prefer regeocode_place.")]
     public async Task<PlaceDto> UpdatePlace(
         [Description("Place id.")] Guid id,
         [Description("New canonical name (optional).")] string? name = null,
         [Description("New category (optional).")] PlaceCategory? category = null,
         [Description("Verified flag (optional).")] bool? verified = null,
+        [Description("Corrected latitude (optional; must accompany longitude).")] double? latitude = null,
+        [Description("Corrected longitude (optional; must accompany latitude).")] double? longitude = null,
+        [Description("Formatted address (optional).")] string? formattedAddress = null,
+        [Description("Containing AdminArea id to re-anchor containment (optional).")] Guid? withinAreaId = null,
         CancellationToken ct = default)
     {
         var u = await user.GetAsync(ct);
-        return Require(await places.UpdateAsync(id, new UpdatePlaceRequest { Name = name, Category = category, Verified = verified }, u.Id, ct));
+        return Require(await places.UpdateAsync(id, new UpdatePlaceRequest
+        {
+            Name = name, Category = category, Verified = verified,
+            Latitude = latitude, Longitude = longitude, FormattedAddress = formattedAddress, WithinAreaId = withinAreaId,
+        }, u.Id, ct));
+    }
+
+    [McpServerTool(Name = "regeocode_place"), Description("Re-run geocoding for an existing place from its address/name and attach the coordinates, containment chain, and OSM id — heals a coordinate-less provisional stub (or refreshes a stale fix). Leaves the place unchanged on a no-hit or a transient geocoder outage.")]
+    public async Task<PlaceDto> RegeocodePlace([Description("Place id.")] Guid id, CancellationToken ct = default)
+    {
+        var u = await user.GetAsync(ct);
+        return Require(await places.RegeocodeAsync(id, u.Id, ct));
+    }
+
+    [McpServerTool(Name = "merge_places"), Description("Merge a duplicate place into the survivor (intoPlaceId): the duplicate's names become aliases, its external ids and saved places move over, and the duplicate id keeps resolving via a tombstone redirect. Use for genuine duplicates — for a WRONG entry with no correct survivor, use delete_place instead (merge would drag the wrong external ids onto the survivor).")]
+    public async Task<PlaceDto> MergePlaces(
+        [Description("The duplicate to merge away.")] Guid sourceId,
+        [Description("The survivor to merge into.")] Guid intoPlaceId,
+        CancellationToken ct = default)
+    {
+        var u = await user.GetAsync(ct);
+        return Require(await merges.MergeAsync(sourceId, intoPlaceId, u.Id, ct));
+    }
+
+    [McpServerTool(Name = "delete_place"), Description("Soft-delete a bad gazetteer entry (e.g. a wrong geocode) with no valid survivor to merge into. Tombstoned: reads 404 and search/resolve exclude it, but the row stays for the audit trail. Idempotent.")]
+    public async Task<string> DeletePlace([Description("Place id.")] Guid id, CancellationToken ct = default)
+    {
+        var u = await user.GetAsync(ct);
+        RequireOk(await places.DeleteAsync(id, u.Id, ct));
+        return $"Deleted {id}.";
     }
 
     [McpServerTool(Name = "add_place_alias"), Description("Add an alternate name (optional language tag) to a place — a translation, colloquialism, or former name.")]
@@ -136,4 +169,16 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         OpStatus.Forbidden => throw new McpException(r.Error ?? "Forbidden."),
         _ => throw new McpException(r.Error ?? "Request failed."),
     };
+
+    private static void RequireOk(OpResult r)
+    {
+        if (r.Status == OpStatus.Ok) return;
+        throw r.Status switch
+        {
+            OpStatus.NotFound => new McpException("Not found."),
+            OpStatus.Invalid => new McpException(r.Error ?? "Invalid request."),
+            OpStatus.Forbidden => new McpException(r.Error ?? "Forbidden."),
+            _ => new McpException(r.Error ?? "Request failed."),
+        };
+    }
 }

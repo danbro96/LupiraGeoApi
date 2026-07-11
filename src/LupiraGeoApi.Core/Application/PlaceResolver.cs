@@ -5,41 +5,48 @@ using NetTopologySuite.Geometries;
 
 namespace LupiraGeoApi.Application;
 
+/// <summary>The result of resolving free text: the resulting <see cref="Place"/> (null only when the geocoder was
+/// unreachable) and how it landed. See <see cref="PlaceResolution"/>.</summary>
+public readonly record struct ResolveOutcome(Place? Place, PlaceResolution Resolution);
+
 /// <summary>
 /// Resolves a free-text location to a gazetteer <see cref="Place"/> — the write path that replaces LupiraCalApi's
 /// global exact-string dedup. Strategy: (1) match an existing place by case-insensitive name or alias; (2) else forward-geocode
 /// and, if coordinates come back, dedupe by name+proximity or create a <see cref="PlaceSource.Geocoded"/> place with
-/// coordinates and an on-demand <see cref="AdminArea"/> containment chain; (3) else provisionally create an unverified
-/// <see cref="PlaceSource.User"/> place with no coordinates. The unique-ish match + upsert removes the query-then-insert
-/// race the old design had.
+/// coordinates and an on-demand <see cref="AdminArea"/> containment chain; (3) on a definitive empty result provisionally
+/// create an unverified <see cref="PlaceSource.User"/> place with no coordinates. A transient geocoder outage
+/// (<see cref="GeocodeStatus.Unavailable"/>) creates NOTHING — it returns <see cref="PlaceResolution.GeocodeUnavailable"/>
+/// so a retry can succeed later, instead of poisoning the gazetteer with an unhealable stub. The caller must pass
+/// non-blank text (validated at the service boundary).
 /// </summary>
-public sealed class PlaceResolver(GeoDbContext db, GeocodingService geocoder)
+public sealed class PlaceResolver(GeoDbContext db, GeocodingService geocoder, AdminAreaService adminAreas)
 {
     private const double DedupeMeters = 60;
 
-    public async Task<Place?> ResolveAsync(string? text, Guid? createdBy = null, CancellationToken ct = default)
+    public async Task<ResolveOutcome> ResolveAsync(string text, Guid? createdBy = null, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(text)) return null;
         var name = string.Join(' ', text.Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
         // (1) Existing place by case-insensitive name or alias.
-        var existing = await db.Places.FirstOrDefaultAsync(p => p.MergedIntoId == null &&
+        var existing = await db.Places.FirstOrDefaultAsync(p => p.MergedIntoId == null && p.DeletedAt == null &&
             (EF.Functions.ILike(p.CanonicalName, name) || p.Aliases.Any(a => EF.Functions.ILike(a.Name, name))), ct);
-        if (existing is not null) return existing;
+        if (existing is not null) return new ResolveOutcome(existing, PlaceResolution.Matched);
 
-        // (2) Forward-geocode. First hit with coordinates wins.
-        var hit = (await geocoder.ForwardAsync(name, limit: 1, ct)).FirstOrDefault();
-        if (hit is not null)
+        // (2) Forward-geocode. A transient outage stops here — do not create anything.
+        var result = await geocoder.ForwardAsync(name, limit: 1, ct);
+        if (result.Status == GeocodeStatus.Unavailable) return new ResolveOutcome(null, PlaceResolution.GeocodeUnavailable);
+
+        if (result.Hits.FirstOrDefault() is { } hit)
         {
             var point = new Point(hit.Lon, hit.Lat) { SRID = 4326 };
 
             var near = await db.Places
-                .Where(p => p.MergedIntoId == null && p.Location != null
+                .Where(p => p.MergedIntoId == null && p.DeletedAt == null && p.Location != null
                     && p.Location.Distance(point) <= DedupeMeters && EF.Functions.ILike(p.CanonicalName, name))
                 .FirstOrDefaultAsync(ct);
-            if (near is not null) return near;
+            if (near is not null) return new ResolveOutcome(near, PlaceResolution.Matched);
 
-            var areaId = await EnsureAreaChainAsync(hit, ct);
+            var areaId = await adminAreas.EnsureChainAsync(hit, ct);
             var place = new Place
             {
                 Id = Guid.NewGuid(),
@@ -59,10 +66,10 @@ public sealed class PlaceResolver(GeoDbContext db, GeocodingService geocoder)
             db.Places.Add(place);
             db.Record(place.Id, CurationAction.Created, createdBy, detail: place.CanonicalName);
             await db.SaveChangesAsync(ct);
-            return place;
+            return new ResolveOutcome(place, PlaceResolution.Geocoded);
         }
 
-        // (3) Provisional user place — no coordinates yet.
+        // (3) Definitive no-hit → provisional user place with no coordinates yet.
         var provisional = new Place
         {
             Id = Guid.NewGuid(),
@@ -77,34 +84,6 @@ public sealed class PlaceResolver(GeoDbContext db, GeocodingService geocoder)
         db.Places.Add(provisional);
         db.Record(provisional.Id, CurationAction.Created, createdBy, detail: provisional.CanonicalName);
         await db.SaveChangesAsync(ct);
-        return provisional;
-    }
-
-    /// <summary>Find-or-create the Country → Region → Locality chain from a geocode hit; returns the deepest area id.</summary>
-    private async Task<Guid?> EnsureAreaChainAsync(GeocodeHit hit, CancellationToken ct)
-    {
-        if (hit.CountryCode is null) return null;
-
-        var country = await db.AdminAreas.FirstOrDefaultAsync(a => a.Level == AdminLevel.Country && a.IsoCode == hit.CountryCode, ct)
-            ?? Add(new AdminArea { Id = Guid.NewGuid(), Level = AdminLevel.Country, Name = hit.Country ?? hit.CountryCode, IsoCode = hit.CountryCode });
-        var deepest = country;
-
-        if (hit.Region is { Length: > 0 } region)
-        {
-            var parentId = deepest.Id;
-            deepest = await db.AdminAreas.FirstOrDefaultAsync(a => a.Level == AdminLevel.Region && a.Name == region && a.WithinAreaId == parentId, ct)
-                ?? Add(new AdminArea { Id = Guid.NewGuid(), Level = AdminLevel.Region, Name = region, WithinAreaId = parentId });
-        }
-
-        if (hit.Locality is { Length: > 0 } locality)
-        {
-            var parentId = deepest.Id;
-            deepest = await db.AdminAreas.FirstOrDefaultAsync(a => a.Level == AdminLevel.Locality && a.Name == locality && a.WithinAreaId == parentId, ct)
-                ?? Add(new AdminArea { Id = Guid.NewGuid(), Level = AdminLevel.Locality, Name = locality, WithinAreaId = parentId });
-        }
-
-        return deepest.Id;
-
-        AdminArea Add(AdminArea a) { db.AdminAreas.Add(a); return a; }
+        return new ResolveOutcome(provisional, PlaceResolution.Provisional);
     }
 }

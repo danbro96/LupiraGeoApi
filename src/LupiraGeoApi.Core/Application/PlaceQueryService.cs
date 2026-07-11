@@ -1,3 +1,4 @@
+using System.Globalization;
 using LupiraGeoApi.Data;
 using LupiraGeoApi.Domain;
 using LupiraGeoApi.Dtos.AdminAreas;
@@ -11,7 +12,7 @@ namespace LupiraGeoApi.Application;
 /// <summary>Read/write over the gazetteer (EF Core + PostGIS): text + spatial search, typeahead suggest, a full single
 /// place with its alias/external-id/containment detail, direct create, curation, and alias management. Reads by id
 /// follow merge-tombstone redirects; every search excludes tombstones.</summary>
-public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver)
+public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, GeocodingService geocoder, AdminAreaService adminAreas)
 {
     public const int MaxResults = 200;
     public const int MaxSuggestions = 25;
@@ -26,7 +27,7 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver)
         double? nearLat, double? nearLon, double? radiusM, double[]? bbox, int? limit, CancellationToken ct = default)
     {
         var take = Math.Clamp(limit ?? 50, 1, MaxResults);
-        IQueryable<Place> query = db.Places.AsNoTracking().Where(p => p.MergedIntoId == null);
+        IQueryable<Place> query = db.Places.AsNoTracking().Where(p => p.MergedIntoId == null && p.DeletedAt == null);
 
         if (!string.IsNullOrWhiteSpace(q))
         {
@@ -70,7 +71,7 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver)
 
         // Coordinates split client-side: ST_X/ST_Y are geometry-only, the columns are geography.
         var places = await db.Places.AsNoTracking()
-            .Where(p => p.MergedIntoId == null)
+            .Where(p => p.MergedIntoId == null && p.DeletedAt == null)
             .Where(p => EF.Functions.ILike(p.CanonicalName, term + "%")
                 || EF.Functions.TrigramsWordSimilarity(term, p.CanonicalName) >= SuggestMinSimilarity
                 || p.Aliases.Any(a => EF.Functions.ILike(a.Name, term + "%")
@@ -173,8 +174,11 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver)
 
     public async Task<OpResult<PlaceDto>> UpdateAsync(Guid id, UpdatePlaceRequest r, Guid actorId, CancellationToken ct = default)
     {
-        var place = await db.Places.Include(p => p.Aliases).Include(p => p.ExternalIds).FirstOrDefaultAsync(p => p.Id == id, ct);
+        var place = await db.Places.Include(p => p.Aliases).Include(p => p.ExternalIds)
+            .FirstOrDefaultAsync(p => p.Id == id && p.DeletedAt == null, ct);
         if (place is null) return OpResult<PlaceDto>.NotFound();
+        if (r is { Latitude: not null, Longitude: null } or { Latitude: null, Longitude: not null })
+            return OpResult<PlaceDto>.Invalid("Latitude and longitude must be supplied together.");
         if (r.Name is { } name)
         {
             if (string.IsNullOrWhiteSpace(name)) return OpResult<PlaceDto>.Invalid("Name cannot be blank.");
@@ -195,11 +199,70 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver)
             place.Verified = v;
             db.Record(place.Id, v ? CurationAction.Verified : CurationAction.Unverified, actorId);
         }
+        if (r is { Latitude: { } lat, Longitude: { } lon })
+        {
+            place.Location = new Point(lon, lat) { SRID = 4326 };
+            db.Record(place.Id, CurationAction.Relocated, actorId, detail: $"{lat.ToString(CultureInfo.InvariantCulture)},{lon.ToString(CultureInfo.InvariantCulture)}");
+        }
+        if (r.FormattedAddress is { } fa) place.FormattedAddress = fa.Trim() is { Length: > 0 } t ? t : null;
+        if (r.WithinAreaId is { } areaId) place.WithinAreaId = areaId;
         await db.SaveChangesAsync(ct);
 
         var dto = place.ToDto();
         dto.Containment = await ContainmentAsync(place.WithinAreaId, ct);
         return OpResult<PlaceDto>.Ok(dto);
+    }
+
+    /// <summary>Re-run forward geocoding for a place from its address/name and attach the coordinates, containment
+    /// chain, and OSM id — heals a coordinate-less provisional stub (or refreshes a stale fix). Leaves the place
+    /// unchanged on a no-hit or a transient geocoder outage.</summary>
+    public async Task<OpResult<PlaceDto>> RegeocodeAsync(Guid id, Guid actorId, CancellationToken ct = default)
+    {
+        var place = await db.Places.Include(p => p.ExternalIds)
+            .FirstOrDefaultAsync(p => p.Id == id && p.MergedIntoId == null && p.DeletedAt == null, ct);
+        if (place is null) return OpResult<PlaceDto>.NotFound();
+
+        var query = string.IsNullOrWhiteSpace(place.FormattedAddress) ? place.CanonicalName : place.FormattedAddress!;
+        var result = await geocoder.ForwardAsync(query, limit: 1, ct);
+        if (result.Status == GeocodeStatus.Unavailable) return OpResult<PlaceDto>.Invalid("Geocoder unavailable; retry.");
+        if (result.Hits.FirstOrDefault() is not { } hit) return OpResult<PlaceDto>.Invalid($"No geocode result for \"{query}\".");
+
+        place.Location = new Point(hit.Lon, hit.Lat) { SRID = 4326 };
+        place.FormattedAddress = hit.DisplayName;
+        place.WithinAreaId = await adminAreas.EnsureChainAsync(hit, ct);
+        place.Source = PlaceSource.Geocoded;
+
+        foreach (var old in place.ExternalIds.Where(x => x.Scheme == ExternalScheme.Osm).ToList())
+        {
+            place.ExternalIds.Remove(old);
+            db.PlaceExternalIds.Remove(old);
+        }
+        if (hit is { OsmType: { } t, OsmId: { } oid })
+        {
+            var ext = new PlaceExternalId { Id = Guid.NewGuid(), PlaceId = place.Id, Scheme = ExternalScheme.Osm, Value = $"{t}/{oid}" };
+            place.ExternalIds.Add(ext);
+            db.PlaceExternalIds.Add(ext);
+        }
+        db.Record(place.Id, CurationAction.Regeocoded, actorId, detail: hit.DisplayName);
+        await db.SaveChangesAsync(ct);
+
+        var dto = place.ToDto();
+        dto.Containment = await ContainmentAsync(place.WithinAreaId, ct);
+        return OpResult<PlaceDto>.Ok(dto);
+    }
+
+    /// <summary>Soft-delete a place: a bad entry (e.g. a wrong geocode) with no valid survivor to merge into. Tombstoned
+    /// (<see cref="Place.DeletedAt"/>), so reads 404 and search/resolve exclude it; the row stays for the audit trail.
+    /// Idempotent.</summary>
+    public async Task<OpResult> DeleteAsync(Guid id, Guid actorId, CancellationToken ct = default)
+    {
+        var place = await db.Places.FirstOrDefaultAsync(p => p.Id == id, ct);
+        if (place is null) return OpResult.NotFound();
+        if (place.DeletedAt is not null) return OpResult.Ok();
+        place.DeletedAt = DateTimeOffset.UtcNow;
+        db.Record(place.Id, CurationAction.Deleted, actorId);
+        await db.SaveChangesAsync(ct);
+        return OpResult.Ok();
     }
 
     public async Task<OpResult<PlaceDto>> AddAliasAsync(Guid placeId, AddAliasRequest r, Guid actorId, CancellationToken ct = default)
@@ -242,17 +305,20 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver)
         return OpResult.Ok();
     }
 
-    /// <summary>Resolve free-text to a place (match/geocode/provision) via <see cref="PlaceResolver"/>.</summary>
+    /// <summary>Resolve free-text to a place (match/geocode/provision) via <see cref="PlaceResolver"/>. A transient
+    /// geocoder outage returns <see cref="PlaceResolution.GeocodeUnavailable"/> with a null <c>PlaceId</c> (nothing
+    /// created) — an Ok result so a batch does not abort; the caller retries that item.</summary>
     public async Task<OpResult<ResolvePlaceResponse>> ResolveAsync(string text, Guid createdBy, CancellationToken ct = default)
     {
-        var place = await resolver.ResolveAsync(text, createdBy, ct);
-        if (place is null) return OpResult<ResolvePlaceResponse>.Invalid("Text is required.");
+        if (string.IsNullOrWhiteSpace(text)) return OpResult<ResolvePlaceResponse>.Invalid("Text is required.");
+        var outcome = await resolver.ResolveAsync(text, createdBy, ct);
         return OpResult<ResolvePlaceResponse>.Ok(new ResolvePlaceResponse
         {
-            PlaceId = place.Id,
-            Name = place.CanonicalName,
-            Latitude = place.Location?.Y,
-            Longitude = place.Location?.X,
+            Resolution = outcome.Resolution,
+            PlaceId = outcome.Place?.Id,
+            Name = outcome.Place?.CanonicalName ?? text.Trim(),
+            Latitude = outcome.Place?.Location?.Y,
+            Longitude = outcome.Place?.Location?.X,
         });
     }
 
@@ -285,6 +351,7 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver)
                 .Include(p => p.Aliases).Include(p => p.ExternalIds)
                 .FirstOrDefaultAsync(p => p.Id == cid, ct);
             if (place is null) return null;
+            if (place.DeletedAt is not null) return null; // soft-deleted: no redirect, reads 404
             if (place.MergedIntoId is null) return place;
             cursor = place.MergedIntoId;
         }

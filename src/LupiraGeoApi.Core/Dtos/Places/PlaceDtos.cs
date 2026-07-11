@@ -78,12 +78,18 @@ public sealed class CreatePlaceRequest
     public Guid? WithinAreaId { get; set; }
 }
 
-/// <summary>Curate a place: rename, recategorize, or verify. Omitted members are left unchanged.</summary>
+/// <summary>Curate a place: rename, recategorize, verify, or correct its location. Omitted members are left unchanged.
+/// <c>Latitude</c>+<c>Longitude</c> (both required together) move the point — for fixing a wrong geocode by hand;
+/// <c>WithinAreaId</c> re-anchors containment to match.</summary>
 public sealed class UpdatePlaceRequest
 {
     public string? Name { get; set; }
     public PlaceCategory? Category { get; set; }
     public bool? Verified { get; set; }
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
+    public string? FormattedAddress { get; set; }
+    public Guid? WithinAreaId { get; set; }
 }
 
 public sealed class AddAliasRequest
@@ -114,7 +120,12 @@ public sealed class ResolvePlaceRequest
 
 public sealed class ResolvePlaceResponse
 {
-    public required Guid PlaceId { get; set; }
+    [JsonConverter(typeof(JsonStringEnumConverter<PlaceResolution>))]
+    public required PlaceResolution Resolution { get; set; }
+
+    /// <summary>Null only when <see cref="Resolution"/> is <see cref="PlaceResolution.GeocodeUnavailable"/> — the
+    /// geocoder was unreachable and nothing was created; the item is retryable.</summary>
+    public Guid? PlaceId { get; set; }
     public required string Name { get; set; }
     public double? Latitude { get; set; }
     public double? Longitude { get; set; }

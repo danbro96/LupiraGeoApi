@@ -34,6 +34,11 @@ public sealed class Place
     public Guid? MergedIntoId { get; set; }
     public Place? MergedInto { get; set; }
 
+    /// <summary>Soft-delete tombstone: set when a bad entry is removed (e.g. a wrong geocode with no valid survivor
+    /// to merge into). Unlike <see cref="MergedIntoId"/> it does NOT redirect — reads 404 and search/resolve exclude
+    /// it. The row stays for the audit trail.</summary>
+    public DateTimeOffset? DeletedAt { get; set; }
+
     public List<PlaceAlias> Aliases { get; set; } = [];
     public List<PlaceExternalId> ExternalIds { get; set; } = [];
 }

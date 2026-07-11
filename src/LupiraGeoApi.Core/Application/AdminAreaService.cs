@@ -29,4 +29,33 @@ public sealed class AdminAreaService(GeoDbContext db)
         var area = await db.AdminAreas.AsNoTracking().FirstOrDefaultAsync(a => a.Id == id, ct);
         return area is null ? OpResult<AdminAreaDto>.NotFound() : OpResult<AdminAreaDto>.Ok(area.ToDto());
     }
+
+    /// <summary>Find-or-create the Country → Region → Locality chain from a geocode hit; returns the deepest area id.
+    /// Stages inserts on the shared (scoped) change tracker — the caller commits them in its own SaveChanges.</summary>
+    public async Task<Guid?> EnsureChainAsync(GeocodeHit hit, CancellationToken ct = default)
+    {
+        if (hit.CountryCode is null) return null;
+
+        var country = await db.AdminAreas.FirstOrDefaultAsync(a => a.Level == AdminLevel.Country && a.IsoCode == hit.CountryCode, ct)
+            ?? Add(new AdminArea { Id = Guid.NewGuid(), Level = AdminLevel.Country, Name = hit.Country ?? hit.CountryCode, IsoCode = hit.CountryCode });
+        var deepest = country;
+
+        if (hit.Region is { Length: > 0 } region)
+        {
+            var parentId = deepest.Id;
+            deepest = await db.AdminAreas.FirstOrDefaultAsync(a => a.Level == AdminLevel.Region && a.Name == region && a.WithinAreaId == parentId, ct)
+                ?? Add(new AdminArea { Id = Guid.NewGuid(), Level = AdminLevel.Region, Name = region, WithinAreaId = parentId });
+        }
+
+        if (hit.Locality is { Length: > 0 } locality)
+        {
+            var parentId = deepest.Id;
+            deepest = await db.AdminAreas.FirstOrDefaultAsync(a => a.Level == AdminLevel.Locality && a.Name == locality && a.WithinAreaId == parentId, ct)
+                ?? Add(new AdminArea { Id = Guid.NewGuid(), Level = AdminLevel.Locality, Name = locality, WithinAreaId = parentId });
+        }
+
+        return deepest.Id;
+
+        AdminArea Add(AdminArea a) { db.AdminAreas.Add(a); return a; }
+    }
 }

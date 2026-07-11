@@ -94,6 +94,58 @@ public sealed class PlacesTests(GeoApiTestFactory factory) : IntegrationTest(fac
     }
 
     [Fact]
+    public async Task Update_can_correct_coordinates_by_hand()
+    {
+        var api = Factory.ApiClient(Email);
+        var created = await CreateAsync(api, "Wrong Spot", 59.0, 18.0);
+        var resp = await api.PatchAsJsonAsync($"/places/{created.Id}", new UpdatePlaceRequest { Latitude = 60.5, Longitude = 15.2 });
+        resp.EnsureSuccessStatusCode();
+        var updated = (await resp.Content.ReadFromJsonAsync<PlaceDto>())!;
+        Assert.Equal(60.5, updated.Latitude!.Value, 4);
+        Assert.Equal(15.2, updated.Longitude!.Value, 4);
+    }
+
+    [Fact]
+    public async Task Update_rejects_half_a_coordinate()
+    {
+        var api = Factory.ApiClient(Email);
+        var created = await CreateAsync(api, "Half", 59.0, 18.0);
+        var resp = await api.PatchAsJsonAsync($"/places/{created.Id}", new UpdatePlaceRequest { Latitude = 60.5 });
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task Delete_tombstones_place_and_hides_it_from_reads()
+    {
+        var api = Factory.ApiClient(Email);
+        var created = await CreateAsync(api, "Bad Entry", 59.33, 18.06);
+
+        var del = await api.DeleteAsync($"/places/{created.Id}");
+        Assert.Equal(HttpStatusCode.NoContent, del.StatusCode);
+
+        Assert.Equal(HttpStatusCode.NotFound, (await api.GetAsync($"/places/{created.Id}")).StatusCode);
+        var hits = await api.GetFromJsonAsync<List<PlaceDto>>("/places?q=Bad%20Entry");
+        Assert.DoesNotContain(hits!, p => p.Id == created.Id);
+
+        // Idempotent — deleting again is a no-op success, not a 404.
+        Assert.Equal(HttpStatusCode.NoContent, (await api.DeleteAsync($"/places/{created.Id}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Resolve_without_geocoder_reports_provisional()
+    {
+        var api = Factory.ApiClient(Email);
+        var resolved = (await (await api.PostAsJsonAsync("/places/resolve", new ResolvePlaceRequest { Text = "Nowhere Special" }))
+            .Content.ReadFromJsonAsync<ResolvePlaceResponse>())!;
+        Assert.Equal(PlaceResolution.Provisional, resolved.Resolution);
+        Assert.NotNull(resolved.PlaceId);
+
+        var again = (await (await api.PostAsJsonAsync("/places/resolve", new ResolvePlaceRequest { Text = "Nowhere Special" }))
+            .Content.ReadFromJsonAsync<ResolvePlaceResponse>())!;
+        Assert.Equal(PlaceResolution.Matched, again.Resolution);   // second time matches the existing entry
+    }
+
+    [Fact]
     public async Task Get_unknown_place_is_404()
     {
         var api = Factory.ApiClient(Email);
