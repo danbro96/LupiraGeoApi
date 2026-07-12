@@ -71,6 +71,27 @@ public sealed class GeocodingFallbackTests(GeocodingFixture fx) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Resolve_dedupes_a_second_text_form_of_the_same_osm_object()
+    {
+        var api = fx.Factory.ApiClient(Email);
+
+        var first = (await (await api.PostAsJsonAsync("/places/resolve", new ResolvePlaceRequest { Text = "Shibuya Crossing" }))
+            .Content.ReadFromJsonAsync<ResolvePlaceResponse>())!;
+        Assert.Equal(PlaceResolution.Geocoded, first.Resolution);
+
+        // A different free-text form (comma-qualified) that geocodes to the SAME OSM object. Name+proximity dedup
+        // misses it because the canonical name differs; without OSM-id dedup the insert would collide on the unique
+        // (Scheme, Value) external-id index and 500. It must reconcile to the existing place as Matched.
+        var resp = await api.PostAsJsonAsync("/places/resolve",
+            new ResolvePlaceRequest { Text = "Shibuya Scramble Crossing, Tokyo, Japan" });
+        resp.EnsureSuccessStatusCode();
+        var second = (await resp.Content.ReadFromJsonAsync<ResolvePlaceResponse>())!;
+
+        Assert.Equal(PlaceResolution.Matched, second.Resolution);
+        Assert.Equal(first.PlaceId, second.PlaceId);
+    }
+
+    [Fact]
     public async Task Regeocode_heals_a_coordinate_less_place()
     {
         var api = fx.Factory.ApiClient(Email);

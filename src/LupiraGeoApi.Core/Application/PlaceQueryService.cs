@@ -5,6 +5,7 @@ using LupiraGeoApi.Dtos.AdminAreas;
 using LupiraGeoApi.Dtos.Places;
 using LupiraGeoApi.Mappers;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using NetTopologySuite.Geometries;
 
 namespace LupiraGeoApi.Application;
@@ -12,7 +13,7 @@ namespace LupiraGeoApi.Application;
 /// <summary>Read/write over the gazetteer (EF Core + PostGIS): text + spatial search, typeahead suggest, a full single
 /// place with its alias/external-id/containment detail, direct create, curation, and alias management. Reads by id
 /// follow merge-tombstone redirects; every search excludes tombstones.</summary>
-public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, GeocodingService geocoder, AdminAreaService adminAreas)
+public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, GeocodingService geocoder, AdminAreaService adminAreas, ILogger<PlaceQueryService> logger)
 {
     public const int MaxResults = 200;
     public const int MaxSuggestions = 25;
@@ -244,7 +245,18 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
             db.PlaceExternalIds.Add(ext);
         }
         db.Record(place.Id, CurationAction.Regeocoded, actorId, detail: hit.DisplayName);
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex)
+        {
+            // Regeocode attaches the hit's OSM id; if another place already claims it this violates the unique
+            // (Scheme, Value) index. Log it (the MCP layer would otherwise hide it) and fail cleanly.
+            logger.LogError(ex, "Regeocoding place {PlaceId} failed to persist; OSM id {Osm} may already belong to another place.",
+                id, hit is { OsmType: { } ot, OsmId: { } oi } ? $"{ot}/{oi}" : "(none)");
+            return OpResult<PlaceDto>.Conflict("Could not persist the regeocode; its OSM id may already belong to another place.");
+        }
 
         var dto = place.ToDto();
         dto.Containment = await ContainmentAsync(place.WithinAreaId, ct);
@@ -311,7 +323,18 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
     public async Task<OpResult<ResolvePlaceResponse>> ResolveAsync(string text, Guid createdBy, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(text)) return OpResult<ResolvePlaceResponse>.Invalid("Text is required.");
-        var outcome = await resolver.ResolveAsync(text, createdBy, ct);
+        ResolveOutcome outcome;
+        try
+        {
+            outcome = await resolver.ResolveAsync(text, createdBy, ct);
+        }
+        catch (DbUpdateException ex)
+        {
+            // Otherwise the MCP layer swallows this into an opaque "An error occurred invoking …". A concurrent
+            // resolve of the same geocoded OSM object can still race the dedup and collide on the unique external id.
+            logger.LogError(ex, "Resolving {Text} failed to persist; a conflicting gazetteer entry may already exist.", text);
+            return OpResult<ResolvePlaceResponse>.Conflict("Could not persist the resolved place; a conflicting gazetteer entry may already exist.");
+        }
         return OpResult<ResolvePlaceResponse>.Ok(new ResolvePlaceResponse
         {
             Resolution = outcome.Resolution,

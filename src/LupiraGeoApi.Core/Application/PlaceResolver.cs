@@ -39,6 +39,17 @@ public sealed class PlaceResolver(GeoDbContext db, GeocodingService geocoder, Ad
         if (result.Hits.FirstOrDefault() is { } hit)
         {
             var point = new Point(hit.Lon, hit.Lat) { SRID = 4326 };
+            var osmId = hit is { OsmType: { } t, OsmId: { } oid } ? $"{t}/{oid}" : null;
+
+            // Dedup by OSM identity first: one real-world object resolves here under many text forms (a bare name
+            // vs a comma-qualified address), and name+proximity dedup misses them because the canonical name differs.
+            // Without this the second resolve inserts a duplicate (Scheme, Value) and SaveChanges throws on the unique index.
+            if (osmId is not null)
+            {
+                var byOsm = await db.Places.FirstOrDefaultAsync(p => p.MergedIntoId == null && p.DeletedAt == null
+                    && p.ExternalIds.Any(x => x.Scheme == ExternalScheme.Osm && x.Value == osmId), ct);
+                if (byOsm is not null) return new ResolveOutcome(byOsm, PlaceResolution.Matched);
+            }
 
             var near = await db.Places
                 .Where(p => p.MergedIntoId == null && p.DeletedAt == null && p.Location != null
@@ -61,8 +72,8 @@ public sealed class PlaceResolver(GeoDbContext db, GeocodingService geocoder, Ad
                 CreatedByPrincipalId = createdBy,
                 CreatedAt = DateTimeOffset.UtcNow,
             };
-            if (hit is { OsmType: { } t, OsmId: { } oid })
-                place.ExternalIds.Add(new PlaceExternalId { Id = Guid.NewGuid(), PlaceId = place.Id, Scheme = ExternalScheme.Osm, Value = $"{t}/{oid}" });
+            if (osmId is not null)
+                place.ExternalIds.Add(new PlaceExternalId { Id = Guid.NewGuid(), PlaceId = place.Id, Scheme = ExternalScheme.Osm, Value = osmId });
             db.Places.Add(place);
             db.Record(place.Id, CurationAction.Created, createdBy, detail: place.CanonicalName);
             await db.SaveChangesAsync(ct);
