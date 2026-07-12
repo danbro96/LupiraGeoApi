@@ -317,6 +317,52 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
         return OpResult.Ok();
     }
 
+    /// <summary>Attach an external gazetteer id (scheme+value) to a place — correcting the reconciliation keys imports
+    /// and dedup match against. Excludes tombstones/merged places (an id on a redirect would never surface).</summary>
+    public async Task<OpResult<PlaceDto>> AddExternalIdAsync(Guid placeId, AddExternalIdRequest r, Guid actorId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(r.Value)) return OpResult<PlaceDto>.Invalid("Value is required.");
+        var value = r.Value.Trim();
+
+        var place = await db.Places.Include(p => p.Aliases).Include(p => p.ExternalIds)
+            .FirstOrDefaultAsync(p => p.Id == placeId && p.MergedIntoId == null && p.DeletedAt == null, ct);
+        if (place is null) return OpResult<PlaceDto>.NotFound();
+        if (place.ExternalIds.Any(x => x.Scheme == r.Scheme && x.Value == value))
+            return OpResult<PlaceDto>.Conflict("External id already exists on this place.");
+
+        var ext = new PlaceExternalId { Id = Guid.NewGuid(), PlaceId = place.Id, Scheme = r.Scheme, Value = value };
+        place.ExternalIds.Add(ext);
+        db.PlaceExternalIds.Add(ext);
+        db.Record(place.Id, CurationAction.ExternalIdAdded, actorId, detail: $"{r.Scheme}:{value}");
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex)
+        {
+            // (Scheme, Value) is globally unique; a cross-place collision surfaces only here. Log it (the MCP layer
+            // would otherwise hide it) and fail cleanly.
+            logger.LogError(ex, "Adding external id {Scheme}:{Value} to place {PlaceId} failed; it may already belong to another place.", r.Scheme, value, placeId);
+            return OpResult<PlaceDto>.Conflict("That external id already belongs to another place.");
+        }
+
+        var dto = place.ToDto();
+        dto.Containment = await ContainmentAsync(place.WithinAreaId, ct);
+        return OpResult<PlaceDto>.Ok(dto);
+    }
+
+    public async Task<OpResult> RemoveExternalIdAsync(Guid placeId, ExternalScheme scheme, string value, Guid actorId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return OpResult.Invalid("Value is required.");
+        var v = value.Trim();
+        var ext = await db.PlaceExternalIds.FirstOrDefaultAsync(x => x.PlaceId == placeId && x.Scheme == scheme && x.Value == v, ct);
+        if (ext is null) return OpResult.NotFound();
+        db.PlaceExternalIds.Remove(ext);
+        db.Record(placeId, CurationAction.ExternalIdRemoved, actorId, detail: $"{scheme}:{v}");
+        await db.SaveChangesAsync(ct);
+        return OpResult.Ok();
+    }
+
     /// <summary>Resolve free-text to a place (match/geocode/provision) via <see cref="PlaceResolver"/>. A transient
     /// geocoder outage returns <see cref="PlaceResolution.GeocodeUnavailable"/> with a null <c>PlaceId</c> (nothing
     /// created) — an Ok result so a batch does not abort; the caller retries that item.</summary>

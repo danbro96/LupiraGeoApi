@@ -142,6 +142,29 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         return Require(await places.AddAliasAsync(id, new AddAliasRequest { Name = name, Lang = lang }, u.Id, ct));
     }
 
+    [McpServerTool(Name = "add_place_external_id"), Description("Attach an external gazetteer id (OSM way/node/relation, Wikidata Q-id, Google place id, GeoNames id) to a place so imports/dedup reconcile against it. Multiple ids per scheme are allowed. 409 if that id already belongs to another place (merge those instead) or is already on this place.")]
+    public async Task<PlaceDto> AddPlaceExternalId(
+        [Description("Place id.")] Guid id,
+        [Description("External scheme: Osm, Wikidata, Google, or Geonames.")] ExternalScheme scheme,
+        [Description("External id value, e.g. 'way/54739745', 'node/123', 'Q42'.")] string value,
+        CancellationToken ct = default)
+    {
+        var u = await user.GetAsync(ct);
+        return Require(await places.AddExternalIdAsync(id, new AddExternalIdRequest { Scheme = scheme, Value = value }, u.Id, ct));
+    }
+
+    [McpServerTool(Name = "remove_place_external_id"), Description("Detach an external id (scheme+value) from a place — e.g. clear a stale OSM id before attaching the correct one. Returns the updated place. Not-found if the place has no such id.")]
+    public async Task<PlaceDto> RemovePlaceExternalId(
+        [Description("Place id.")] Guid id,
+        [Description("External scheme: Osm, Wikidata, Google, or Geonames.")] ExternalScheme scheme,
+        [Description("External id value to remove, e.g. 'way/6601741'.")] string value,
+        CancellationToken ct = default)
+    {
+        var u = await user.GetAsync(ct);
+        RequireOk(await places.RemoveExternalIdAsync(id, scheme, value, u.Id, ct));
+        return Require(await places.GetAsync(id, ct));
+    }
+
     [McpServerTool(Name = "save_place"), Description("Save a personal label (private, owner-scoped) over a gazetteer place id, or over a raw coordinate. This is where 'Home', 'Work', family homes live — not the shared catalog.")]
     public async Task<SavedPlaceDto> SavePlace(
         [Description("Personal label, e.g. 'Home' or 'Mormor & morfar'.")] string label,
@@ -159,6 +182,34 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
             Label = label, PlaceId = placeId, Latitude = latitude, Longitude = longitude,
             Icon = icon, Notes = notes, IsFavorite = isFavorite,
         }, ct));
+    }
+
+    [McpServerTool(Name = "update_saved_place"), Description("Update one of the caller's saved places (owner-scoped): rename, re-icon, annotate, (un)favorite, or re-point it. Omitted fields are left unchanged. Re-point by passing EITHER placeId (link a gazetteer place; clears any raw coordinate) OR latitude+longitude together (set a raw coordinate; clears any link) — not both. Not-found if the id isn't yours.")]
+    public async Task<SavedPlaceDto> UpdateSavedPlace(
+        [Description("Saved place id (from list_saved_places).")] Guid id,
+        [Description("New label (optional).")] string? label = null,
+        [Description("Re-point to this gazetteer place id (optional; clears raw coordinate).")] Guid? placeId = null,
+        [Description("New raw latitude (optional; must accompany longitude; clears place link).")] double? latitude = null,
+        [Description("New raw longitude (optional; must accompany latitude).")] double? longitude = null,
+        [Description("Icon hint (optional).")] string? icon = null,
+        [Description("Free-text note (optional).")] string? notes = null,
+        [Description("Favorite flag (optional).")] bool? isFavorite = null,
+        CancellationToken ct = default)
+    {
+        var u = await user.GetAsync(ct);
+        return Require(await saved.UpdateAsync(u.Id, id, new UpdateSavedPlaceRequest
+        {
+            Label = label, PlaceId = placeId, Latitude = latitude, Longitude = longitude,
+            Icon = icon, Notes = notes, IsFavorite = isFavorite,
+        }, ct));
+    }
+
+    [McpServerTool(Name = "delete_saved_place"), Description("Delete one of the caller's saved places (owner-scoped). Not-found if the id isn't yours.")]
+    public async Task<string> DeleteSavedPlace([Description("Saved place id (from list_saved_places).")] Guid id, CancellationToken ct = default)
+    {
+        var u = await user.GetAsync(ct);
+        RequireOk(await saved.DeleteAsync(u.Id, id, ct));
+        return $"Deleted saved place {id}.";
     }
 
     private static T Require<T>(OpResult<T> r) => r.Status switch

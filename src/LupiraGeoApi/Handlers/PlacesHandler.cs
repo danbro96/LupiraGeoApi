@@ -51,6 +51,20 @@ public sealed class PlacesHandler(PlaceQueryService places, PlaceMergeService me
         return OpResultMap.NoContentNotFoundProblem(await places.RemoveAliasAsync(id, aliasId, u.Id, ct));
     }
 
+    public async Task<Results<Ok<PlaceDto>, NotFound, ProblemHttpResult, UnauthorizedHttpResult>> AddExternalIdAsync(
+        Guid id, AddExternalIdRequest r, CancellationToken ct)
+    {
+        var u = await user.GetAsync(ct);
+        return OpResultMap.OkNotFoundProblem(await places.AddExternalIdAsync(id, r, u.Id, ct));
+    }
+
+    public async Task<Results<NoContent, NotFound, ProblemHttpResult, UnauthorizedHttpResult>> RemoveExternalIdAsync(
+        Guid id, ExternalScheme scheme, string value, CancellationToken ct)
+    {
+        var u = await user.GetAsync(ct);
+        return OpResultMap.NoContentNotFoundProblem(await places.RemoveExternalIdAsync(id, scheme, value, u.Id, ct));
+    }
+
     public async Task<Results<Ok<PlaceDto>, NotFound, ProblemHttpResult, UnauthorizedHttpResult>> MergeAsync(
         Guid id, MergePlaceRequest r, CancellationToken ct)
     {

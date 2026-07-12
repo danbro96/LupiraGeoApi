@@ -25,7 +25,7 @@ public enum SuggestionType { Place, Locality }
 
 /// <summary>A curation decision recorded on a <see cref="Place"/> in the append-only <c>curation_log</c>. Stable names —
 /// they are the future event-type names, so never rename a member (add new ones; keep old ones readable).</summary>
-public enum CurationAction { Created, Verified, Unverified, Renamed, Recategorized, AliasAdded, AliasRemoved, Merged, Regeocoded, Relocated, Deleted }
+public enum CurationAction { Created, Verified, Unverified, Renamed, Recategorized, AliasAdded, AliasRemoved, Merged, Regeocoded, Relocated, Deleted, ExternalIdAdded, ExternalIdRemoved }
 
 /// <summary>How <see cref="Place"/> resolution landed: an existing entry matched, a fresh geocode created one, a
 /// coordinate-less provisional stub was created (address not found), or the geocoder was unreachable so nothing was

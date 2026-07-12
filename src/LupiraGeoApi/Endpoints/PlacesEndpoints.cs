@@ -54,6 +54,16 @@ public static class PlacesEndpoints
             .WithSummary("Remove an alias from a place.")
             .Produces(StatusCodes.Status204NoContent).Produces(StatusCodes.Status404NotFound).Produces(StatusCodes.Status401Unauthorized);
 
+        group.MapPost("/{id:guid}/external-ids", (Guid id, AddExternalIdRequest r, PlacesHandler h, CancellationToken ct) => h.AddExternalIdAsync(id, r, ct))
+            .WithName("AddPlaceExternalId")
+            .WithSummary("Attach an external gazetteer id (scheme+value) to a place; multiple ids per scheme are allowed. 409 if the id already belongs to another place (merge those instead) or is already on this place.")
+            .Produces<PlaceDto>(StatusCodes.Status200OK).Produces(StatusCodes.Status404NotFound).ProducesProblem(StatusCodes.Status400BadRequest).ProducesProblem(StatusCodes.Status409Conflict).Produces(StatusCodes.Status401Unauthorized);
+
+        group.MapDelete("/{id:guid}/external-ids/{scheme}/{**value}", (Guid id, ExternalScheme scheme, string value, PlacesHandler h, CancellationToken ct) => h.RemoveExternalIdAsync(id, scheme, value, ct))
+            .WithName("RemovePlaceExternalId")
+            .WithSummary("Detach an external id (scheme + full value, e.g. /external-ids/Osm/way/6601741) from a place.")
+            .Produces(StatusCodes.Status204NoContent).Produces(StatusCodes.Status404NotFound).ProducesProblem(StatusCodes.Status400BadRequest).Produces(StatusCodes.Status401Unauthorized);
+
         group.MapPost("/{id:guid}/merge", (Guid id, MergePlaceRequest r, PlacesHandler h, CancellationToken ct) => h.MergeAsync(id, r, ct))
             .WithName("MergePlace")
             .WithSummary("Merge a duplicate into the survivor (intoPlaceId): names become aliases, external ids and saved places move over, and the duplicate id keeps resolving via a tombstone redirect.")
