@@ -1,10 +1,10 @@
-using System.Net;
-using System.Net.Http.Json;
 using LupiraGeoApi.Data;
 using LupiraGeoApi.Domain;
 using LupiraGeoApi.Dtos.Places;
 using Microsoft.Extensions.DependencyInjection;
 using NetTopologySuite.Geometries;
+using System.Net.Http.Json;
+using System.Net;
 using Xunit;
 
 namespace LupiraGeoApi.IntegrationTests;

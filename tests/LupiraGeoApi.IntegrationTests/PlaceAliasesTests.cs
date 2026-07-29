@@ -1,6 +1,6 @@
-using System.Net;
-using System.Net.Http.Json;
 using LupiraGeoApi.Dtos.Places;
+using System.Net.Http.Json;
+using System.Net;
 using Xunit;
 
 namespace LupiraGeoApi.IntegrationTests;

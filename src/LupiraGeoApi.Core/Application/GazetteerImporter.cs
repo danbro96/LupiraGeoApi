@@ -1,11 +1,11 @@
-using System.Globalization;
-using System.IO.Compression;
 using LupiraGeoApi.Data;
 using LupiraGeoApi.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using NetTopologySuite.Geometries;
+using System.Globalization;
+using System.IO.Compression;
 
 namespace LupiraGeoApi.Application;
 

@@ -1,4 +1,3 @@
-using System.Globalization;
 using LupiraGeoApi.Data;
 using LupiraGeoApi.Domain;
 using LupiraGeoApi.Dtos.AdminAreas;
@@ -7,6 +6,7 @@ using LupiraGeoApi.Mappers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using NetTopologySuite.Geometries;
+using System.Globalization;
 
 namespace LupiraGeoApi.Application;
 

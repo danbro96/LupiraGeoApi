@@ -1,3 +1,4 @@
+using LupiraGeoApi.Domain.Identity;
 using LupiraGeoApi.Domain;
 using Marten;
 using Npgsql;

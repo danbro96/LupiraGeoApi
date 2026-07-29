@@ -1,3 +1,4 @@
+using JasperFx;
 using LupiraGeoApi.Application;
 using LupiraGeoApi.Data;
 using LupiraGeoApi.Domain;
@@ -5,7 +6,6 @@ using Marten;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
-using JasperFx;
 
 namespace Microsoft.Extensions.DependencyInjection;
 

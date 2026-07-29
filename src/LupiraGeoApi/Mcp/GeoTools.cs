@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using LupiraGeoApi.Application;
 using LupiraGeoApi.Auth;
 using LupiraGeoApi.Domain;
@@ -6,8 +5,9 @@ using LupiraGeoApi.Dtos.Geocoding;
 using LupiraGeoApi.Dtos.Places;
 using LupiraGeoApi.Dtos.SavedPlaces;
 using LupiraGeoApi.Mappers;
-using ModelContextProtocol;
 using ModelContextProtocol.Server;
+using ModelContextProtocol;
+using System.ComponentModel;
 
 namespace LupiraGeoApi.Mcp;
 

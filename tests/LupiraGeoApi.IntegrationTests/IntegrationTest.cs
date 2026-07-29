@@ -1,5 +1,6 @@
-using System.Net.Http.Json;
+using Marten;
 using LupiraGeoApi.Dtos.Me;
+using System.Net.Http.Json;
 using Xunit;
 
 namespace LupiraGeoApi.IntegrationTests;
@@ -10,6 +11,8 @@ namespace LupiraGeoApi.IntegrationTests;
 public abstract class IntegrationTest(GeoApiTestFactory factory) : IAsyncLifetime
 {
     protected readonly GeoApiTestFactory Factory = factory;
+
+    protected IDocumentStore Store => Factory.Store;
 
     public async Task InitializeAsync() => await Factory.ResetAsync();
     public Task DisposeAsync() => Task.CompletedTask;

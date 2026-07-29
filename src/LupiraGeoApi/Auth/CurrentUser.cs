@@ -1,4 +1,5 @@
 using LupiraGeoApi.Application;
+using LupiraGeoApi.Domain.Identity;
 using LupiraGeoApi.Domain;
 using System.Security.Claims;
 
