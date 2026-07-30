@@ -39,7 +39,10 @@ builder.Services.AddScoped<SavedPlacesHandler>();
 builder.Services.AddMcpServer().WithHttpTransport().WithTools<GeoTools>();
 
 builder.Services.ConfigureHttpJsonOptions(o =>
-    o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+{
+    o.SerializerOptions.NumberHandling = JsonNumberHandling.Strict;
+    o.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+});
 
 // --- Auth: OIDC JWT for the REST surface. One identity authority (Authentik); the OIDC `sub` is the only
 //           cross-service join key. ---
