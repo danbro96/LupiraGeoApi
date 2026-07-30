@@ -1,6 +1,6 @@
+using System.Text.Json.Serialization;
 using LupiraGeoApi.Domain;
 using LupiraGeoApi.Dtos.AdminAreas;
-using System.Text.Json.Serialization;
 
 namespace LupiraGeoApi.Dtos.Places;
 

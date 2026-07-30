@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using LupiraGeoApi.Application;
 using LupiraGeoApi.Auth;
 using LupiraGeoApi.Domain;
@@ -5,9 +6,8 @@ using LupiraGeoApi.Dtos.Geocoding;
 using LupiraGeoApi.Dtos.Places;
 using LupiraGeoApi.Dtos.SavedPlaces;
 using LupiraGeoApi.Mappers;
-using ModelContextProtocol.Server;
 using ModelContextProtocol;
-using System.ComponentModel;
+using ModelContextProtocol.Server;
 
 namespace LupiraGeoApi.Mcp;
 
@@ -80,9 +80,13 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         var u = await user.GetAsync(ct);
         return Require(await places.CreateAsync(new CreatePlaceRequest
         {
-            Name = name, Kind = kind, Category = category,
-            Latitude = latitude, Longitude = longitude,
-            FormattedAddress = formattedAddress, WithinAreaId = withinAreaId,
+            Name = name,
+            Kind = kind,
+            Category = category,
+            Latitude = latitude,
+            Longitude = longitude,
+            FormattedAddress = formattedAddress,
+            WithinAreaId = withinAreaId,
         }, u.Id, ct));
     }
 
@@ -101,8 +105,13 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         var u = await user.GetAsync(ct);
         return Require(await places.UpdateAsync(id, new UpdatePlaceRequest
         {
-            Name = name, Category = category, Verified = verified,
-            Latitude = latitude, Longitude = longitude, FormattedAddress = formattedAddress, WithinAreaId = withinAreaId,
+            Name = name,
+            Category = category,
+            Verified = verified,
+            Latitude = latitude,
+            Longitude = longitude,
+            FormattedAddress = formattedAddress,
+            WithinAreaId = withinAreaId,
         }, u.Id, ct));
     }
 
@@ -179,8 +188,13 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         var u = await user.GetAsync(ct);
         return Require(await saved.CreateAsync(u.Id, new CreateSavedPlaceRequest
         {
-            Label = label, PlaceId = placeId, Latitude = latitude, Longitude = longitude,
-            Icon = icon, Notes = notes, IsFavorite = isFavorite,
+            Label = label,
+            PlaceId = placeId,
+            Latitude = latitude,
+            Longitude = longitude,
+            Icon = icon,
+            Notes = notes,
+            IsFavorite = isFavorite,
         }, ct));
     }
 
@@ -199,8 +213,13 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         var u = await user.GetAsync(ct);
         return Require(await saved.UpdateAsync(u.Id, id, new UpdateSavedPlaceRequest
         {
-            Label = label, PlaceId = placeId, Latitude = latitude, Longitude = longitude,
-            Icon = icon, Notes = notes, IsFavorite = isFavorite,
+            Label = label,
+            PlaceId = placeId,
+            Latitude = latitude,
+            Longitude = longitude,
+            Icon = icon,
+            Notes = notes,
+            IsFavorite = isFavorite,
         }, ct));
     }
 

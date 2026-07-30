@@ -1,5 +1,5 @@
-using LupiraGeoApi.Domain.Identity;
 using LupiraGeoApi.Domain;
+using LupiraGeoApi.Domain.Identity;
 using Marten;
 using Weasel.Core;
 

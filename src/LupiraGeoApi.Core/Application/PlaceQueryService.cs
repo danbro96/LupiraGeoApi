@@ -1,3 +1,4 @@
+using System.Globalization;
 using LupiraGeoApi.Data;
 using LupiraGeoApi.Domain;
 using LupiraGeoApi.Dtos.AdminAreas;
@@ -6,7 +7,6 @@ using LupiraGeoApi.Mappers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using NetTopologySuite.Geometries;
-using System.Globalization;
 
 namespace LupiraGeoApi.Application;
 
@@ -28,13 +28,14 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
         double? nearLat, double? nearLon, double? radiusM, double[]? bbox, int? limit, CancellationToken ct = default)
     {
         var take = Math.Clamp(limit ?? 50, 1, MaxResults);
-        IQueryable<Place> query = db.Places.AsNoTracking().Where(p => p.MergedIntoId == null && p.DeletedAt == null);
+        var query = db.Places.AsNoTracking().Where(p => p.MergedIntoId == null && p.DeletedAt == null);
 
         if (!string.IsNullOrWhiteSpace(q))
         {
             var term = q.Trim();
             query = query.Where(p => EF.Functions.ILike(p.CanonicalName, $"%{term}%"));
         }
+
         if (category is { } c) query = query.Where(p => p.Category == c);
         if (kind is { } k) query = query.Where(p => p.Kind == k);
         if (withinAreaId is { } areaId) query = query.Where(p => p.WithinAreaId == areaId);
@@ -79,7 +80,11 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
                     || EF.Functions.TrigramsWordSimilarity(term, a.Name) >= SuggestMinSimilarity))
             .Select(p => new
             {
-                p.Id, Name = p.CanonicalName, p.Category, p.Location, p.FormattedAddress,
+                p.Id,
+                Name = p.CanonicalName,
+                p.Category,
+                p.Location,
+                p.FormattedAddress,
                 Score = EF.Functions.TrigramsWordSimilarity(term, p.CanonicalName),
             })
             .OrderByDescending(x => x.Score)
@@ -92,7 +97,9 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
                 || EF.Functions.TrigramsWordSimilarity(term, a.Name) >= SuggestMinSimilarity)
             .Select(a => new
             {
-                a.Id, a.Name, Location = a.Centroid,
+                a.Id,
+                a.Name,
+                Location = a.Centroid,
                 Context = a.WithinArea == null ? null : a.WithinArea.Name,
                 Score = EF.Functions.TrigramsWordSimilarity(term, a.Name),
             })
@@ -145,7 +152,7 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
         if (string.IsNullOrWhiteSpace(value)) return OpResult<PlaceDto>.Invalid("Value is required.");
         var placeId = await db.PlaceExternalIds.AsNoTracking()
             .Where(x => x.Scheme == scheme && x.Value == value.Trim())
-            .Select(x => (Guid?)x.PlaceId)
+            .Select(x => (Guid?) x.PlaceId)
             .FirstOrDefaultAsync(ct);
         return placeId is { } pid ? await GetAsync(pid, ct) : OpResult<PlaceDto>.NotFound();
     }
@@ -190,21 +197,25 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
                 db.Record(place.Id, CurationAction.Renamed, actorId, detail: name);
             }
         }
+
         if (r.Category is { } cat && cat != place.Category)
         {
             place.Category = cat;
             db.Record(place.Id, CurationAction.Recategorized, actorId, detail: cat.ToString());
         }
+
         if (r.Verified is { } v && v != place.Verified)
         {
             place.Verified = v;
             db.Record(place.Id, v ? CurationAction.Verified : CurationAction.Unverified, actorId);
         }
+
         if (r is { Latitude: { } lat, Longitude: { } lon })
         {
             place.Location = new Point(lon, lat) { SRID = 4326 };
             db.Record(place.Id, CurationAction.Relocated, actorId, detail: $"{lat.ToString(CultureInfo.InvariantCulture)},{lon.ToString(CultureInfo.InvariantCulture)}");
         }
+
         if (r.FormattedAddress is { } fa) place.FormattedAddress = fa.Trim() is { Length: > 0 } t ? t : null;
         if (r.WithinAreaId is { } areaId) place.WithinAreaId = areaId;
         await db.SaveChangesAsync(ct);
@@ -238,12 +249,14 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
             place.ExternalIds.Remove(old);
             db.PlaceExternalIds.Remove(old);
         }
+
         if (hit is { OsmType: { } t, OsmId: { } oid })
         {
             var ext = new PlaceExternalId { Id = Guid.NewGuid(), PlaceId = place.Id, Scheme = ExternalScheme.Osm, Value = $"{t}/{oid}" };
             place.ExternalIds.Add(ext);
             db.PlaceExternalIds.Add(ext);
         }
+
         db.Record(place.Id, CurationAction.Regeocoded, actorId, detail: hit.DisplayName);
         try
         {
@@ -381,6 +394,7 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
             logger.LogError(ex, "Resolving {Text} failed to persist; a conflicting gazetteer entry may already exist.", text);
             return OpResult<ResolvePlaceResponse>.Conflict("Could not persist the resolved place; a conflicting gazetteer entry may already exist.");
         }
+
         return OpResult<ResolvePlaceResponse>.Ok(new ResolvePlaceResponse
         {
             Resolution = outcome.Resolution,
@@ -406,6 +420,7 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
             if (!r.IsOk) return OpResult<List<ResolvePlaceResponse>>.Invalid($"Item {responses.Count}: {r.Error}");
             responses.Add(r.Value!);
         }
+
         return OpResult<List<ResolvePlaceResponse>>.Ok(responses);
     }
 
@@ -424,6 +439,7 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
             if (place.MergedIntoId is null) return place;
             cursor = place.MergedIntoId;
         }
+
         return null;
     }
 
@@ -439,6 +455,7 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
             chain.Add(area.ToDto());
             cursor = area.WithinAreaId;
         }
+
         chain.Reverse();
         return chain;
     }

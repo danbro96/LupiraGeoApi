@@ -1,5 +1,5 @@
-using LupiraGeoApi.Domain;
 using System.Text.Json.Serialization;
+using LupiraGeoApi.Domain;
 
 namespace LupiraGeoApi.Dtos.Geocoding;
 

@@ -1,10 +1,10 @@
+using JasperFx; // ConcurrencyException moved here in Marten 9 (JasperFx core).
 using LupiraGeoApi.Data;
 using LupiraGeoApi.Domain;
 using LupiraGeoApi.Dtos.SavedPlaces;
 using LupiraGeoApi.Mappers;
 using Marten;
 using Microsoft.EntityFrameworkCore;
-using JasperFx; // ConcurrencyException moved here in Marten 9 (JasperFx core).
 
 namespace LupiraGeoApi.Application;
 
@@ -67,6 +67,7 @@ public sealed class SavedPlaceService(IDocumentSession session, GeoDbContext db)
             if (string.IsNullOrWhiteSpace(label)) return OpResult<SavedPlaceDto>.Invalid("Label cannot be blank.");
             saved.Label = label.Trim();
         }
+
         if (r.Icon is not null) saved.Icon = r.Icon;
         if (r.Notes is not null) saved.Notes = string.IsNullOrWhiteSpace(r.Notes) ? null : r.Notes.Trim();
         if (r.IsFavorite is { } fav) saved.IsFavorite = fav;
@@ -75,6 +76,7 @@ public sealed class SavedPlaceService(IDocumentSession session, GeoDbContext db)
         // Optimistic concurrency: another device modifying this doc between our load and save throws.
         try { await session.SaveChangesAsync(ct); }
         catch (ConcurrencyException) { return OpResult<SavedPlaceDto>.Conflict("Saved place was modified concurrently; reload and retry."); }
+
         return OpResult<SavedPlaceDto>.Ok(await ToDtoAsync(saved, ct));
     }
 
@@ -106,6 +108,7 @@ public sealed class SavedPlaceService(IDocumentSession session, GeoDbContext db)
                     .Select(p => new { p.Id, p.Location }), ct);
             foreach (var p in pts) coords[p.Id] = (p.Location!.Y, p.Location.X);
         }
+
         return rows.Select(s =>
         {
             var dto = s.ToDto();

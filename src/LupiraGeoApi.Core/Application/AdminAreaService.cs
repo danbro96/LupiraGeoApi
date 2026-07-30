@@ -12,7 +12,7 @@ public sealed class AdminAreaService(GeoDbContext db)
     public async Task<OpResult<List<AdminAreaDto>>> ListAsync(AdminLevel? level, Guid? withinAreaId, string? q, int? limit, CancellationToken ct = default)
     {
         var take = Math.Clamp(limit ?? 100, 1, 500);
-        IQueryable<AdminArea> query = db.AdminAreas.AsNoTracking();
+        var query = db.AdminAreas.AsNoTracking();
         if (level is { } l) query = query.Where(a => a.Level == l);
         if (withinAreaId is { } w) query = query.Where(a => a.WithinAreaId == w);
         if (!string.IsNullOrWhiteSpace(q))
@@ -20,6 +20,7 @@ public sealed class AdminAreaService(GeoDbContext db)
             var term = q.Trim();
             query = query.Where(a => EF.Functions.ILike(a.Name, $"%{term}%"));
         }
+
         var rows = await query.OrderBy(a => a.Name).Take(take).ToListAsync(ct);
         return OpResult<List<AdminAreaDto>>.Ok(rows.Select(a => a.ToDto()).ToList());
     }

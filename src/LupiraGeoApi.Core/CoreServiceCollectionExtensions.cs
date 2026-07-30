@@ -1,7 +1,6 @@
 using JasperFx;
 using LupiraGeoApi.Application;
 using LupiraGeoApi.Data;
-using LupiraGeoApi.Domain;
 using Marten;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;

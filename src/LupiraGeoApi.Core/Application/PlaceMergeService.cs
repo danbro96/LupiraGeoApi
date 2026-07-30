@@ -50,9 +50,11 @@ public sealed class PlaceMergeService(GeoDbContext db, Marten.IDocumentSession s
                 db.PlaceExternalIds.Remove(ext);
                 continue;
             }
+
             ext.PlaceId = winner.Id;
             winner.ExternalIds.Add(ext);
         }
+
         loser.ExternalIds.Clear();
 
         winner.Location ??= loser.Location;
@@ -74,6 +76,7 @@ public sealed class PlaceMergeService(GeoDbContext db, Marten.IDocumentSession s
                 saved.PlaceId = winner.Id;
                 session.Store(saved);
             }
+
             await session.SaveChangesAsync(ct);
         }
 

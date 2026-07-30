@@ -1,11 +1,11 @@
+using System.Globalization;
+using System.IO.Compression;
 using LupiraGeoApi.Data;
 using LupiraGeoApi.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using NetTopologySuite.Geometries;
-using System.Globalization;
-using System.IO.Compression;
 
 namespace LupiraGeoApi.Application;
 
@@ -52,6 +52,7 @@ public sealed class GazetteerImporter(GeoDbContext db, IConfiguration config, IL
             existing.Add(c.GeonamesId);
             added++;
         }
+
         await db.SaveChangesAsync(ct);
         return added;
     }
@@ -68,12 +69,17 @@ public sealed class GazetteerImporter(GeoDbContext db, IConfiguration config, IL
             var iso = r.Code.Split('.')[0];
             db.AdminAreas.Add(new AdminArea
             {
-                Id = Guid.NewGuid(), Level = AdminLevel.Region, Name = r.Name, IsoCode = r.Code,
-                WithinAreaId = byIso.TryGetValue(iso, out var cid) ? cid : null, GeonamesId = r.GeonamesId,
+                Id = Guid.NewGuid(),
+                Level = AdminLevel.Region,
+                Name = r.Name,
+                IsoCode = r.Code,
+                WithinAreaId = byIso.TryGetValue(iso, out var cid) ? cid : null,
+                GeonamesId = r.GeonamesId,
             });
             existing.Add(r.GeonamesId);
             added++;
         }
+
         await db.SaveChangesAsync(ct);
         return added;
     }
@@ -95,15 +101,20 @@ public sealed class GazetteerImporter(GeoDbContext db, IConfiguration config, IL
         {
             if (ParseCity(line) is not { } city || existing.Contains(city.GeonamesId)) continue;
             var parentId = byAdmin1.TryGetValue($"{city.CountryCode}.{city.Admin1}", out var rid) ? rid
-                : byIso.TryGetValue(city.CountryCode, out var cid) ? cid : (Guid?)null;
+                : byIso.TryGetValue(city.CountryCode, out var cid) ? cid : (Guid?) null;
             db.AdminAreas.Add(new AdminArea
             {
-                Id = Guid.NewGuid(), Level = AdminLevel.Locality, Name = city.Name, WithinAreaId = parentId,
-                Centroid = new Point(city.Lon, city.Lat) { SRID = 4326 }, GeonamesId = city.GeonamesId,
+                Id = Guid.NewGuid(),
+                Level = AdminLevel.Locality,
+                Name = city.Name,
+                WithinAreaId = parentId,
+                Centroid = new Point(city.Lon, city.Lat) { SRID = 4326 },
+                GeonamesId = city.GeonamesId,
             });
             existing.Add(city.GeonamesId);
             if (++added % 5000 == 0) await db.SaveChangesAsync(ct);
         }
+
         await db.SaveChangesAsync(ct);
         return added;
     }

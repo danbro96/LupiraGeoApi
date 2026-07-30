@@ -1,10 +1,10 @@
+using System.Globalization;
+using System.Net;
+using System.Text.Json;
 using LupiraGeoApi.Domain;
 using Marten;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Globalization;
-using System.Net;
-using System.Text.Json;
 
 namespace LupiraGeoApi.Application;
 
@@ -87,6 +87,7 @@ public sealed class GeocodingService(
                 await CacheAsync(id, "reverse", $"{qlat},{qlon}", coarse.RootElement, ct);
                 return hit;
             }
+
             return null;
         }
         finally
@@ -116,6 +117,7 @@ public sealed class GeocodingService(
             {
                 var fetch = await GetAsync(client, baseUrl + pathQuery, ct);
                 if (fetch is null) { anyFailure = true; continue; } // transport failure after retries
+
                 var hits = ParseArray(fetch.RootElement);
                 if (hits.Count > 0)
                 {
@@ -123,6 +125,7 @@ public sealed class GeocodingService(
                     fetch.Dispose();
                     return ForwardResult.FromHits(hits);
                 }
+
                 emptyResult?.Dispose();
                 emptyResult = fetch; // valid empty answer — freeze it only if no later endpoint does better
             }
@@ -134,6 +137,7 @@ public sealed class GeocodingService(
                 await CacheAsync(id, "forward", query, emptyResult.RootElement, ct);
                 return ForwardResult.Empty;
             }
+
             return anyFailure ? ForwardResult.Unavailable : ForwardResult.Empty;
         }
         finally
@@ -170,7 +174,8 @@ public sealed class GeocodingService(
                     await Task.Delay(RetryAfter(resp) ?? Backoff(attempt), ct);
                     continue;
                 }
-                logger.LogWarning("Geocode {Url} returned {Status}.", url, (int)resp.StatusCode);
+
+                logger.LogWarning("Geocode {Url} returned {Status}.", url, (int) resp.StatusCode);
                 return null;
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -185,13 +190,14 @@ public sealed class GeocodingService(
                     await Task.Delay(Backoff(attempt), ct);
                     continue;
                 }
+
                 logger.LogWarning(ex, "Geocode request failed ({Url}) after {Attempts} attempts.", url, attempt + 1);
                 return null;
             }
         }
     }
 
-    private static bool IsTransient(HttpStatusCode s) => s == HttpStatusCode.TooManyRequests || (int)s >= 500;
+    private static bool IsTransient(HttpStatusCode s) => s == HttpStatusCode.TooManyRequests || (int) s >= 500;
 
     private static TimeSpan Backoff(int attempt) => TimeSpan.FromMilliseconds(250 * (attempt + 1));
 

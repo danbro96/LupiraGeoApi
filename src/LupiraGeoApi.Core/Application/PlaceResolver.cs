@@ -25,7 +25,7 @@ public sealed class PlaceResolver(GeoDbContext db, GeocodingService geocoder, Ad
 
     public async Task<ResolveOutcome> ResolveAsync(string text, Guid? createdBy = null, CancellationToken ct = default)
     {
-        var name = string.Join(' ', text.Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        var name = string.Join(' ', text.Trim().Split((char[]?) null, StringSplitOptions.RemoveEmptyEntries));
 
         // (1) Existing place by case-insensitive name or alias.
         var existing = await db.Places.FirstOrDefaultAsync(p => p.MergedIntoId == null && p.DeletedAt == null &&
