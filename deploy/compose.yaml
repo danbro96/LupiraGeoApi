@@ -14,6 +14,8 @@ services:
     image: danbro96/lupira-geo-api:${IMAGE_TAG:-latest}
     container_name: lupira-geo-api
     environment:
+      # /depz gate (X-Probe-Key from devops-monitor); empty = /depz off.
+      Depz__ProbeKey: ${DEPZ_PROBE_KEY:-}
       # Postgres — Marten `geo_user` schema + EF Core/PostGIS `geo` schema in one DB. NO grant on other apps' databases.
       ConnectionStrings__Postgres: "Host=postgres;Port=5432;Database=lupira_geo;Username=lupira_geo_user;Password=${LUPIRA_GEO_DB_PASSWORD:?required}"
 

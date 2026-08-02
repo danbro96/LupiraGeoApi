@@ -13,7 +13,7 @@ namespace LupiraGeoApi.Mcp;
 
 /// <summary>Geo tools for the agent — the same Core services the REST handlers use, scoped to the caller. Reads cover
 /// search/lookup/reverse-geocode; writes cover the import + curation path (forward-geocode, resolve, create, save,
-/// alias, curate). LAN/WireGuard-only (see <see cref="LupiraGeoApi.Endpoints.McpExposure"/>), so no public write surface.</summary>
+/// alias, curate). LAN/WireGuard-only (see <see cref="LupiraGeoApi.Endpoints.LanOnlyExposure"/>), so no public write surface.</summary>
 [McpServerToolType]
 public sealed class GeoTools(CurrentUser user, PlaceQueryService places, GeocodingService geocoder, PlaceMergeService merges, SavedPlaceService saved)
 {

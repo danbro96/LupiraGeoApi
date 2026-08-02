@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 using LupiraGeoApi.Application;
 using LupiraGeoApi.Auth;
 using LupiraGeoApi.Data;
+using LupiraGeoApi.Dependencies;
 using LupiraGeoApi.Endpoints;
 using LupiraGeoApi.Handlers;
 using LupiraGeoApi.Health;
@@ -12,6 +13,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
@@ -35,7 +37,7 @@ builder.Services.AddScoped<AdminAreasHandler>();
 builder.Services.AddScoped<SavedPlacesHandler>();
 
 // MCP server for the agent (read-only find/get/reverse-geocode tools), mounted at /mcp over Streamable HTTP.
-// LAN/WireGuard-only — not published through the tunnel (see UseMcpLanOnly + the MapMcp call below).
+// LAN/WireGuard-only — not published through the tunnel (see UseLanOnlySurfaces + the MapMcp call below).
 builder.Services.AddMcpServer().WithHttpTransport().WithTools<GeoTools>();
 
 builder.Services.ConfigureHttpJsonOptions(o =>
@@ -46,20 +48,35 @@ builder.Services.ConfigureHttpJsonOptions(o =>
 
 // --- Auth: OIDC JWT for the REST surface. One identity authority (Authentik); the OIDC `sub` is the only
 //           cross-service join key. ---
+// `dotnet build` regenerates openapi/ via getdocument, which boots this Program with no real config —
+// skip the guard there (and in Development, where the dev-header scheme needs no authority).
+var isOpenApiBuild = Environment.GetCommandLineArgs()
+    .Any(a => a.Contains("getdocument", StringComparison.OrdinalIgnoreCase));
+
+var oidc = builder.Configuration.GetSection(OidcAuthOptions.SectionName).Get<OidcAuthOptions>() ?? new OidcAuthOptions();
+if (!isOpenApiBuild && !builder.Environment.IsDevelopment()
+    && (string.IsNullOrWhiteSpace(oidc.Authority) || string.IsNullOrWhiteSpace(oidc.Audience)))
+    throw new InvalidOperationException("Auth:Oidc Authority + Audience are required outside Development.");
+
 var authBuilder = builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
-        options.Authority = builder.Configuration["Auth:Authority"];
-        options.Audience = builder.Configuration["Auth:Audience"];
+        options.Authority = oidc.Authority;
+        options.Audience = oidc.Audience;
         options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
         options.Events = new JwtBearerEvents
         {
-            // MCP auth spec: a 401 on /mcp advertises the RFC 9728 metadata so clients can discover the issuer.
+            // MCP auth spec: a 401 on /mcp advertises the RFC 9728 metadata so clients can discover the
+            // issuer. HandleResponse suppresses the default bare "Bearer" header so exactly one goes out.
             OnChallenge = ctx =>
             {
                 if (ctx.Request.Path.StartsWithSegments("/mcp"))
-                    ctx.Response.Headers.Append("WWW-Authenticate",
-                        $"Bearer resource_metadata=\"{McpResourceMetadata.ResourceMetadataUrl(ctx.Request)}\"");
+                {
+                    ctx.HandleResponse();
+                    ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                    ctx.Response.Headers.WWWAuthenticate =
+                        $"Bearer resource_metadata=\"{McpResourceMetadata.ResourceMetadataUrl(ctx.Request)}\"";
+                }
                 return Task.CompletedTask;
             },
         };
@@ -84,12 +101,14 @@ builder.Services.AddOpenTelemetry()
     {
         // Health probes are polled constantly by docker + devops-monitor; their spans add nothing.
         t.AddAspNetCoreInstrumentation(o => o.Filter = ctx =>
-            ctx.Request.Path != "/livez" && ctx.Request.Path != "/readyz" && ctx.Request.Path != "/pingz");
+            ctx.Request.Path != "/livez" && ctx.Request.Path != "/readyz" && ctx.Request.Path != "/pingz"
+            && ctx.Request.Path != "/depz");
         t.AddHttpClientInstrumentation();
         if (!string.IsNullOrWhiteSpace(otlpEndpoint)) t.AddOtlpExporter();
     })
     .WithMetrics(m =>
     {
+        m.AddMeter("LupiraGeoApi.*");
         m.AddAspNetCoreInstrumentation();
         m.AddHttpClientInstrumentation();
         m.AddRuntimeInstrumentation();
@@ -106,6 +125,18 @@ builder.Logging.AddOpenTelemetry(o =>
 
 builder.Services.AddHealthChecks()
     .AddCheck<DatabaseReadyCheck>("postgres", tags: ["ready"]);
+
+// Non-gating dependency probe (/depz): the geocoder edges, on a dedicated client so probe traffic
+// never rides the throttled fallback geocoder.
+builder.Services.Configure<DepzOptions>(builder.Configuration.GetSection(DepzOptions.SectionName));
+var depzOptions = builder.Configuration.GetSection(DepzOptions.SectionName).Get<DepzOptions>() ?? new DepzOptions();
+builder.Services.AddSingleton(sp => DependencyTargets.From(
+    sp.GetRequiredService<IOptions<NominatimOptions>>(), builder.Configuration));
+builder.Services.AddSingleton<DependencyReportCache>();
+builder.Services.AddSingleton<DependencyProbe>();
+builder.Services.AddHttpClient(DependencyProbe.ProbeClientName, c => c.Timeout = depzOptions.ProbeTimeout);
+if (depzOptions.Enabled)
+    builder.Services.AddHostedService<DependencyPollWorker>();
 
 builder.Services.AddOpenApi("v1", options =>
 {
@@ -182,11 +213,12 @@ if (app.Environment.IsDevelopment())
     await db.Database.MigrateAsync();
 }
 
+// LAN-only surfaces (/mcp + its discovery metadata): 404 anything arriving through the tunnel,
+// before auth so a tunnelled probe never even receives a challenge.
+app.UseLanOnlySurfaces();
+
 app.UseAuthentication();
 app.UseAuthorization();
-
-// Defence-in-depth: 404 any /mcp request that arrives bearing Cloudflare edge headers.
-app.UseMcpLanOnly();
 
 app.MapOpenApi("/openapi/{documentName}.json").AllowAnonymous();
 app.MapScalarApiReference("/scalar", o => o
@@ -205,6 +237,7 @@ app.MapHealthChecks("/readyz", new HealthCheckOptions { Predicate = c => c.Tags.
     .DisableHttpMetrics();
 
 // REST surface.
+app.MapDepz();
 app.MapPing();
 app.MapMe();
 app.MapPlaces();
@@ -214,7 +247,7 @@ app.MapSavedPlaces();
 
 // Agent MCP transport (LAN/WireGuard-only; excluded from the Cloudflare Tunnel at the edge).
 // RFC 9728 metadata lets MCP clients discover the Authentik issuer from the 401 challenge.
-app.MapMcpResourceMetadata(app.Configuration["Auth:Authority"]);
+app.MapMcpResourceMetadata(app.Configuration["Auth:Oidc:Authority"]);
 app.MapMcp("/mcp").RequireAuthorization("ApiPolicy");
 
 app.Run();

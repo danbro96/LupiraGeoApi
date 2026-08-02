@@ -8,16 +8,16 @@ namespace LupiraGeoApi.Endpoints;
 /// answered 404, indistinguishable from "no such route". Plain middleware rather than an endpoint filter
 /// because <c>MapMcp</c>'s streaming endpoint does not run the minimal-API filter pipeline.
 /// </summary>
-internal static class McpExposure
+internal static class LanOnlyExposure
 {
-    private const string PathPrefix = "/mcp";
+    private static readonly string[] LanOnlyPrefixes = ["/mcp", "/.well-known/oauth-protected-resource"];
     private static readonly string[] CloudflareHeaders = ["CF-Ray", "CF-Connecting-IP"];
 
-    public static IApplicationBuilder UseMcpLanOnly(this WebApplication app)
+    public static IApplicationBuilder UseLanOnlySurfaces(this WebApplication app)
     {
         return app.Use(async (ctx, next) =>
         {
-            if (ctx.Request.Path.StartsWithSegments(PathPrefix)
+            if (LanOnlyPrefixes.Any(p => ctx.Request.Path.StartsWithSegments(p))
                 && CloudflareHeaders.Any(h => ctx.Request.Headers.ContainsKey(h)))
             {
                 // Came in through the Cloudflare Tunnel — pretend the route doesn't exist.
