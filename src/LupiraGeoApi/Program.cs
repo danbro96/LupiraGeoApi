@@ -84,7 +84,7 @@ builder.Services.AddOpenTelemetry()
     {
         // Health probes are polled constantly by docker + devops-monitor; their spans add nothing.
         t.AddAspNetCoreInstrumentation(o => o.Filter = ctx =>
-            ctx.Request.Path != "/livez" && ctx.Request.Path != "/readyz");
+            ctx.Request.Path != "/livez" && ctx.Request.Path != "/readyz" && ctx.Request.Path != "/pingz");
         t.AddHttpClientInstrumentation();
         if (!string.IsNullOrWhiteSpace(otlpEndpoint)) t.AddOtlpExporter();
     })
@@ -205,6 +205,7 @@ app.MapHealthChecks("/readyz", new HealthCheckOptions { Predicate = c => c.Tags.
     .DisableHttpMetrics();
 
 // REST surface.
+app.MapPing();
 app.MapMe();
 app.MapPlaces();
 app.MapGeocode();
