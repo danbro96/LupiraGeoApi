@@ -20,8 +20,8 @@ services:
       ConnectionStrings__Postgres: "Host=postgres;Port=5432;Database=lupira_geo;Username=lupira_geo_user;Password=${LUPIRA_GEO_DB_PASSWORD:?required}"
 
       # REST auth — Authentik OIDC (JWT). Same issuer as the other Lupira apps; the OIDC `sub` is the only cross-service join key.
-      Auth__Authority: ${AUTH_AUTHORITY:-https://auth.lupira.com/application/o/lupira-geo/}
-      Auth__Audience: ${AUTH_AUDIENCE:-lupira-geo}
+      Auth__Oidc__Authority: ${AUTH_AUTHORITY:-https://auth.lupira.com/application/o/lupira-geo/}
+      Auth__Oidc__Audience: ${AUTH_AUDIENCE:-lupira-geo}
 
       # Geocoding — self-hosted Nominatim (forward + reverse). Empty disables it (resolver provisions user places, no external call).
       Nominatim__BaseUrl: ${NOMINATIM_BASE_URL:-}
