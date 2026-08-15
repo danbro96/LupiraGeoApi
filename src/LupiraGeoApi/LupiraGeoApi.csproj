@@ -24,6 +24,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Committed default basemap style templates; a same-named file under Basemap:AssetsPath overrides. -->
+    <Content Update="Basemap\*.template.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- The bounded context (Domain + Application + Data). The host is a thin transport/composition
          layer over it; the project boundary keeps ASP.NET out of the core. Marten / Npgsql flow in
          transitively from Core. -->

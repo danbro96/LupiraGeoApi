@@ -121,6 +121,21 @@ public sealed class ResolvePlacesBatchRequest
     public required List<string> Texts { get; set; }
 }
 
+/// <summary>Bulk get-by-ids (max 200) — hydrates place ids other services store (calendar items, contact addresses)
+/// into coordinates in one call. Duplicates are allowed; responses align index-for-index with the input.</summary>
+public sealed class LookupPlacesRequest
+{
+    public required List<Guid> Ids { get; set; }
+}
+
+/// <summary><c>Place</c> is null when the id is unknown or soft-deleted; on a merge redirect it is the survivor
+/// (<c>Place.Id != RequestedId</c>). Containment is omitted — <c>GET /places/{id}</c> remains the detail call.</summary>
+public sealed class PlaceLookupItemDto
+{
+    public required Guid RequestedId { get; set; }
+    public PlaceDto? Place { get; set; }
+}
+
 /// <summary>Resolve free-text to a place id — match an existing entry, geocode, or provisionally create. This is what
 /// LupiraCalApi calls when an item/travel-leg/contact address carries a location string.</summary>
 public sealed class ResolvePlaceRequest

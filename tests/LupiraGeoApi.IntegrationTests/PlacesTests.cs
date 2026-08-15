@@ -34,6 +34,20 @@ public sealed class PlacesTests(GeoApiTestFactory factory) : IntegrationTest(fac
     }
 
     [Fact]
+    public async Task Bbox_with_wrong_arity_is_rejected()
+    {
+        var api = Factory.ApiClient(Email);
+        var resp = await api.GetAsync("/places?bbox=17.9&bbox=59.2&bbox=18.2");
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+
+        await CreateAsync(api, "Inside", 59.3293, 18.0686);
+        await CreateAsync(api, "Outside", 57.7089, 11.9746); // Gothenburg
+        var hits = await api.GetFromJsonAsync<List<PlaceDto>>("/places?bbox=17.9&bbox=59.2&bbox=18.2&bbox=59.4");
+        Assert.Contains(hits!, p => p.Name == "Inside");
+        Assert.DoesNotContain(hits!, p => p.Name == "Outside");
+    }
+
+    [Fact]
     public async Task Near_search_returns_only_within_radius_ordered_by_distance()
     {
         var api = Factory.ApiClient(Email);

@@ -863,6 +863,58 @@
         ]
       }
     },
+    "/places/lookup": {
+      "post": {
+        "tags": [
+          "Places"
+        ],
+        "summary": "Bulk get-by-ids (max 200) — hydrate stored place ids into coordinates in one call. Responses align index-for-index; a null place means unknown or deleted, a merged id returns the survivor. Containment is omitted (use GET /places/{id} for detail).",
+        "operationId": "LookupPlaces",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LookupPlacesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlaceLookupItemDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
     "/places/resolve": {
       "post": {
         "tags": [
@@ -1586,6 +1638,21 @@
           }
         }
       },
+      "LookupPlacesRequest": {
+        "required": [
+          "ids"
+        ],
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
       "MeDto": {
         "required": [
           "id",
@@ -1797,6 +1864,28 @@
           "Poi",
           "Address"
         ]
+      },
+      "PlaceLookupItemDto": {
+        "required": [
+          "requestedId"
+        ],
+        "type": "object",
+        "properties": {
+          "requestedId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "place": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PlaceDto"
+              }
+            ]
+          }
+        }
       },
       "PlaceResolution": {
         "enum": [

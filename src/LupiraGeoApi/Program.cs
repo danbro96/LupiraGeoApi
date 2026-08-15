@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using LupiraGeoApi.Application;
 using LupiraGeoApi.Auth;
+using LupiraGeoApi.Basemap;
 using LupiraGeoApi.Data;
 using LupiraGeoApi.Dependencies;
 using LupiraGeoApi.Endpoints;
@@ -35,6 +36,9 @@ builder.Services.AddScoped<PlacesHandler>();
 builder.Services.AddScoped<GeocodeHandler>();
 builder.Services.AddScoped<AdminAreasHandler>();
 builder.Services.AddScoped<SavedPlacesHandler>();
+
+// Self-hosted MapLibre basemap (style + pmtiles + glyphs/sprites); serves nothing until Basemap:AssetsPath is set.
+builder.Services.Configure<BasemapOptions>(builder.Configuration.GetSection(BasemapOptions.SectionName));
 
 // MCP server for the agent (read-only find/get/reverse-geocode tools), mounted at /mcp over Streamable HTTP.
 // LAN/WireGuard-only — not published through the tunnel (see UseLanOnlySurfaces + the MapMcp call below).
@@ -244,6 +248,7 @@ app.MapPlaces();
 app.MapGeocode();
 app.MapAdminAreas();
 app.MapSavedPlaces();
+app.MapBasemap();
 
 // Agent MCP transport (LAN/WireGuard-only; excluded from the Cloudflare Tunnel at the edge).
 // RFC 9728 metadata lets MCP clients discover the Authentik issuer from the 401 challenge.

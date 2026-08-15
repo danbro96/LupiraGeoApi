@@ -33,6 +33,10 @@ services:
       # Gazetteer seed source (the `--seed-gazetteer` one-shot). Defaults to the public GeoNames dump.
       Geonames__BaseUrl: ${GEONAMES_BASE_URL:-https://download.geonames.org/export/dump}
 
+      # Self-hosted MapLibre basemap (/basemap: style.json + pmtiles + glyphs/sprites). Empty = surface 404s.
+      # Point at a volume holding tiles/basemap.pmtiles, fonts/, sprites/ (see README → Basemap).
+      Basemap__AssetsPath: ${BASEMAP_ASSETS_PATH:-}
+
       # OTEL — same Basic Auth header convention as the other .NET apps (http/protobuf; 5-min metric cadence).
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
       OTEL_EXPORTER_OTLP_PROTOCOL: ${OTEL_EXPORTER_OTLP_PROTOCOL:-http/protobuf}
@@ -48,6 +52,8 @@ services:
       retries: 5
       start_period: 60s
     restart: unless-stopped
+    # volumes:
+    #   - /path/to/basemap-assets:/basemap:ro   # required only when BASEMAP_ASSETS_PATH is set
     networks:
       - default
       - medelynas_data         # Postgres

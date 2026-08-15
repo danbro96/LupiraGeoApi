@@ -14,10 +14,11 @@ MCP (LAN-only). See [docs/architecture.md](docs/architecture.md).
 - `GET /places/suggest` — trigram typeahead over place names/aliases + localities.
 - `GET /places/{id}` (follows merge redirects) · `GET /places/by-external/{scheme}/{value}` · `POST /places` · `PATCH /places/{id}`
 - `POST /places/{id}/aliases` · `DELETE /places/{id}/aliases/{aliasId}` · `POST /places/{id}/merge`
-- `POST /places/resolve` · `POST /places/resolve:batch`
+- `POST /places/resolve` · `POST /places/resolve:batch` · `POST /places/lookup` — bulk get-by-ids (max 200, merge-follow)
 - `GET /geocode/reverse` · `GET /geocode/forward`
 - `GET /admin-areas` · `GET /admin-areas/{id}`
 - `GET|POST|PATCH|DELETE /me/places` — saved places
+- `GET /basemap/style.json?theme=light|dark` + `GET /basemap/{path}` — self-hosted MapLibre basemap (Protomaps `.pmtiles` with HTTP Range, glyphs, sprites) from `Basemap:AssetsPath`; authed, outside OpenAPI
 - `GET /me` · `/livez` · `/readyz` · `/openapi/v1.json` · `/scalar/v1` · `/mcp` (LAN-only)
 
 ## Develop

@@ -40,6 +40,9 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
         if (kind is { } k) query = query.Where(p => p.Kind == k);
         if (withinAreaId is { } areaId) query = query.Where(p => p.WithinAreaId == areaId);
 
+        if (bbox is { Length: > 0 and not 4 })
+            return OpResult<List<PlaceDto>>.Invalid("bbox requires exactly 4 values: minLon, minLat, maxLon, maxLat.");
+
         if (bbox is { Length: 4 })
         {
             var env = Envelope(bbox);
@@ -422,6 +425,47 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
         }
 
         return OpResult<List<ResolvePlaceResponse>>.Ok(responses);
+    }
+
+    /// <summary>Bulk get-by-ids (max <see cref="MaxResults"/>): one query per merge-chain depth rather than per id.
+    /// Same per-id semantics as <see cref="GetAsync"/> — merge redirects followed to the survivor, unknown and
+    /// soft-deleted ids yield a null place — but containment is omitted. Responses align index-for-index.</summary>
+    public async Task<OpResult<List<PlaceLookupItemDto>>> LookupAsync(List<Guid> ids, CancellationToken ct = default)
+    {
+        if (ids is not { Count: > 0 }) return OpResult<List<PlaceLookupItemDto>>.Invalid("Ids is required.");
+        if (ids.Count > MaxResults)
+            return OpResult<List<PlaceLookupItemDto>>.Invalid($"At most {MaxResults} ids per lookup.");
+
+        var loaded = new Dictionary<Guid, Place>();
+        var seen = new HashSet<Guid>(ids);
+        var frontier = seen.ToList();
+        while (frontier.Count > 0)
+        {
+            var batch = await db.Places.AsNoTracking()
+                .Include(p => p.Aliases).Include(p => p.ExternalIds)
+                .Where(p => frontier.Contains(p.Id))
+                .ToListAsync(ct);
+            foreach (var place in batch) loaded[place.Id] = place;
+            frontier = batch.Select(p => p.MergedIntoId).OfType<Guid>().Where(seen.Add).ToList();
+        }
+
+        var items = new List<PlaceLookupItemDto>(ids.Count);
+        foreach (var requested in ids)
+        {
+            var walked = new HashSet<Guid>();
+            Place? survivor = null;
+            Guid? cursor = requested;
+            while (cursor is { } cid && walked.Add(cid) && loaded.TryGetValue(cid, out var place))
+            {
+                if (place.DeletedAt is not null) break;
+                if (place.MergedIntoId is null) { survivor = place; break; }
+                cursor = place.MergedIntoId;
+            }
+
+            items.Add(new PlaceLookupItemDto { RequestedId = requested, Place = survivor?.ToDto() });
+        }
+
+        return OpResult<List<PlaceLookupItemDto>>.Ok(items);
     }
 
     /// <summary>Load a place by id, following the merge-tombstone chain to the survivor (cycle-guarded).</summary>

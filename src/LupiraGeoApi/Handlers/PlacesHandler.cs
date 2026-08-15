@@ -21,6 +21,10 @@ public sealed class PlacesHandler(PlaceQueryService places, PlaceMergeService me
     public async Task<Results<Ok<PlaceDto>, NotFound, ProblemHttpResult, UnauthorizedHttpResult>> GetAsync(Guid id, CancellationToken ct) =>
         OpResultMap.OkNotFoundProblem(await places.GetAsync(id, ct));
 
+    public async Task<Results<Ok<List<PlaceLookupItemDto>>, ProblemHttpResult, UnauthorizedHttpResult>> LookupAsync(
+        LookupPlacesRequest r, CancellationToken ct) =>
+        OpResultMap.OkProblem(await places.LookupAsync(r.Ids, ct));
+
     public async Task<Results<Ok<PlaceDto>, NotFound, ProblemHttpResult, UnauthorizedHttpResult>> GetByExternalIdAsync(
         ExternalScheme scheme, string value, CancellationToken ct) =>
         OpResultMap.OkNotFoundProblem(await places.GetByExternalIdAsync(scheme, value, ct));

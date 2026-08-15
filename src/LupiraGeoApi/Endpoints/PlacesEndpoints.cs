@@ -79,6 +79,11 @@ public static class PlacesEndpoints
             .WithSummary("Soft-delete a bad entry (e.g. a wrong geocode) with no valid survivor to merge into: tombstoned, so reads 404 and search/resolve exclude it, but the row stays for the audit trail. Idempotent.")
             .Produces(StatusCodes.Status204NoContent).Produces(StatusCodes.Status404NotFound).Produces(StatusCodes.Status401Unauthorized);
 
+        group.MapPost("/lookup", (LookupPlacesRequest r, PlacesHandler h, CancellationToken ct) => h.LookupAsync(r, ct))
+            .WithName("LookupPlaces")
+            .WithSummary("Bulk get-by-ids (max 200) — hydrate stored place ids into coordinates in one call. Responses align index-for-index; a null place means unknown or deleted, a merged id returns the survivor. Containment is omitted (use GET /places/{id} for detail).")
+            .Produces<List<PlaceLookupItemDto>>(StatusCodes.Status200OK).ProducesProblem(StatusCodes.Status400BadRequest).Produces(StatusCodes.Status401Unauthorized);
+
         group.MapPost("/resolve", (ResolvePlaceRequest r, PlacesHandler h, CancellationToken ct) => h.ResolveAsync(r, ct))
             .WithName("ResolvePlace")
             .WithSummary("Resolve free-text to a place id — match an existing entry, geocode, or provisionally create. Used by upstream services (e.g. LupiraCalApi) to anchor a location string.")
