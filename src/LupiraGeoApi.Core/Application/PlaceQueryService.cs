@@ -22,9 +22,11 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
     /// <summary>word_similarity floor — below this a trigram match is noise, not a suggestion.</summary>
     private const double SuggestMinSimilarity = 0.3;
 
-    /// <summary>Browse/search: text (trigram), category/kind, containment, and spatial (<c>near</c> radius or <c>bbox</c>).</summary>
+    /// <summary>Browse/search: text (trigram), category/kind, containment, curation state (<c>hasCoordinates</c>/
+    /// <c>source</c>/<c>verified</c>), and spatial (<c>near</c> radius or <c>bbox</c>).</summary>
     public async Task<OpResult<List<PlaceDto>>> SearchAsync(
         string? q, PlaceCategory? category, PlaceKind? kind, Guid? withinAreaId,
+        bool? hasCoordinates, PlaceSource? source, bool? verified,
         double? nearLat, double? nearLon, double? radiusM, double[]? bbox, int? limit, CancellationToken ct = default)
     {
         var take = Math.Clamp(limit ?? 50, 1, MaxResults);
@@ -39,6 +41,9 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
         if (category is { } c) query = query.Where(p => p.Category == c);
         if (kind is { } k) query = query.Where(p => p.Kind == k);
         if (withinAreaId is { } areaId) query = query.Where(p => p.WithinAreaId == areaId);
+        if (hasCoordinates is { } hc) query = query.Where(p => (p.Location != null) == hc);
+        if (source is { } src) query = query.Where(p => p.Source == src);
+        if (verified is { } v) query = query.Where(p => p.Verified == v);
 
         if (bbox is { Length: > 0 and not 4 })
             return OpResult<List<PlaceDto>>.Invalid("bbox requires exactly 4 values: minLon, minLat, maxLon, maxLat.");
@@ -66,21 +71,30 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
         return OpResult<List<PlaceDto>>.Ok(results.Select(p => p.ToDto()).ToList());
     }
 
-    /// <summary>Typeahead over places (canonical name + aliases) and AdminArea localities, ranked by trigram
-    /// word-similarity. Localities come from the GeoNames seed, so cities suggest without a gazetteer entry.</summary>
+    /// <summary>Typeahead over places (canonical name + aliases) and AdminArea localities: prefix matches first,
+    /// then trigram word-similarity scored against the best of name/alias. Localities come from the GeoNames seed,
+    /// so cities suggest without a gazetteer entry; a same-name place shadows its locality.</summary>
     public async Task<OpResult<List<PlaceSuggestionDto>>> SuggestAsync(string q, int? limit, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(q)) return OpResult<List<PlaceSuggestionDto>>.Invalid("q is required.");
-        var term = q.Trim();
+        var term = q?.Trim() ?? "";
+        if (term.Length < 2) return OpResult<List<PlaceSuggestionDto>>.Invalid("q must be at least 2 characters.");
         var take = Math.Clamp(limit ?? 10, 1, MaxSuggestions);
+        var prefix = EscapeLike(term) + "%";
+
+        // <% is served by the GIN trigram indexes (the >= function form is not); the similarity in the projection
+        // only scores the index-filtered survivors. The operator reads pg_trgm.word_similarity_threshold — set per
+        // transaction so the floor stays a code-owned constant without role/database config.
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        await db.Database.ExecuteSqlRawAsync(
+            string.Create(CultureInfo.InvariantCulture, $"SET LOCAL pg_trgm.word_similarity_threshold = {SuggestMinSimilarity}"), ct);
 
         // Coordinates split client-side: ST_X/ST_Y are geometry-only, the columns are geography.
         var places = await db.Places.AsNoTracking()
             .Where(p => p.MergedIntoId == null && p.DeletedAt == null)
-            .Where(p => EF.Functions.ILike(p.CanonicalName, term + "%")
-                || EF.Functions.TrigramsWordSimilarity(term, p.CanonicalName) >= SuggestMinSimilarity
-                || p.Aliases.Any(a => EF.Functions.ILike(a.Name, term + "%")
-                    || EF.Functions.TrigramsWordSimilarity(term, a.Name) >= SuggestMinSimilarity))
+            .Where(p => EF.Functions.ILike(p.CanonicalName, prefix)
+                || EF.Functions.TrigramsAreWordSimilar(term, p.CanonicalName)
+                || p.Aliases.Any(a => EF.Functions.ILike(a.Name, prefix)
+                    || EF.Functions.TrigramsAreWordSimilar(term, a.Name)))
             .Select(p => new
             {
                 p.Id,
@@ -88,30 +102,36 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
                 p.Category,
                 p.Location,
                 p.FormattedAddress,
-                Score = EF.Functions.TrigramsWordSimilarity(term, p.CanonicalName),
+                IsPrefix = EF.Functions.ILike(p.CanonicalName, prefix) || p.Aliases.Any(a => EF.Functions.ILike(a.Name, prefix)),
+                Score = Math.Max(
+                    EF.Functions.TrigramsWordSimilarity(term, p.CanonicalName),
+                    p.Aliases.Select(a => (double?) EF.Functions.TrigramsWordSimilarity(term, a.Name)).Max() ?? 0),
             })
-            .OrderByDescending(x => x.Score)
+            .OrderByDescending(x => x.IsPrefix).ThenByDescending(x => x.Score)
             .Take(take)
             .ToListAsync(ct);
 
         var localities = await db.AdminAreas.AsNoTracking()
             .Where(a => a.Level == AdminLevel.Locality)
-            .Where(a => EF.Functions.ILike(a.Name, term + "%")
-                || EF.Functions.TrigramsWordSimilarity(term, a.Name) >= SuggestMinSimilarity)
+            .Where(a => EF.Functions.ILike(a.Name, prefix) || EF.Functions.TrigramsAreWordSimilar(term, a.Name))
             .Select(a => new
             {
                 a.Id,
                 a.Name,
                 Location = a.Centroid,
                 Context = a.WithinArea == null ? null : a.WithinArea.Name,
+                IsPrefix = EF.Functions.ILike(a.Name, prefix),
                 Score = EF.Functions.TrigramsWordSimilarity(term, a.Name),
             })
-            .OrderByDescending(x => x.Score)
+            .OrderByDescending(x => x.IsPrefix).ThenByDescending(x => x.Score)
             .Take(take)
             .ToListAsync(ct);
 
+        await tx.CommitAsync(ct);
+
+        var placeNames = places.Select(p => p.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var merged = places
-            .Select(p => (p.Score, Dto: new PlaceSuggestionDto
+            .Select(p => (p.IsPrefix, p.Score, Dto: new PlaceSuggestionDto
             {
                 Id = p.Id,
                 Type = SuggestionType.Place,
@@ -121,21 +141,25 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
                 Longitude = p.Location?.X,
                 Context = p.FormattedAddress,
             }))
-            .Concat(localities.Select(a => (a.Score, Dto: new PlaceSuggestionDto
-            {
-                Id = a.Id,
-                Type = SuggestionType.Locality,
-                Name = a.Name,
-                Latitude = a.Location?.Y,
-                Longitude = a.Location?.X,
-                Context = a.Context,
-            })))
-            .OrderByDescending(x => x.Score)
+            .Concat(localities
+                .Where(a => !placeNames.Contains(a.Name.Trim()))
+                .Select(a => (a.IsPrefix, a.Score, Dto: new PlaceSuggestionDto
+                {
+                    Id = a.Id,
+                    Type = SuggestionType.Locality,
+                    Name = a.Name,
+                    Latitude = a.Location?.Y,
+                    Longitude = a.Location?.X,
+                    Context = a.Context,
+                })))
+            .OrderByDescending(x => x.IsPrefix).ThenByDescending(x => x.Score)
             .Take(take)
             .Select(x => x.Dto)
             .ToList();
         return OpResult<List<PlaceSuggestionDto>>.Ok(merged);
     }
+
+    private static string EscapeLike(string s) => s.Replace(@"\", @"\\").Replace("%", @"\%").Replace("_", @"\_");
 
     /// <summary>A single place with aliases, external ids, and the containment chain (outermost→innermost).
     /// Follows merge-tombstone redirects to the surviving place.</summary>
@@ -230,15 +254,16 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
 
     /// <summary>Re-run forward geocoding for a place from its address/name and attach the coordinates, containment
     /// chain, and OSM id — heals a coordinate-less provisional stub (or refreshes a stale fix). Leaves the place
-    /// unchanged on a no-hit or a transient geocoder outage.</summary>
-    public async Task<OpResult<PlaceDto>> RegeocodeAsync(Guid id, Guid actorId, CancellationToken ct = default)
+    /// unchanged on a no-hit or a transient geocoder outage. <paramref name="force"/> bypasses and overwrites the
+    /// frozen geocode cache — the only way to heal a stub whose empty answer got frozen.</summary>
+    public async Task<OpResult<PlaceDto>> RegeocodeAsync(Guid id, Guid actorId, bool force = false, CancellationToken ct = default)
     {
         var place = await db.Places.Include(p => p.ExternalIds)
             .FirstOrDefaultAsync(p => p.Id == id && p.MergedIntoId == null && p.DeletedAt == null, ct);
         if (place is null) return OpResult<PlaceDto>.NotFound();
 
         var query = string.IsNullOrWhiteSpace(place.FormattedAddress) ? place.CanonicalName : place.FormattedAddress!;
-        var result = await geocoder.ForwardAsync(query, limit: 1, ct);
+        var result = await geocoder.ForwardAsync(query, limit: 1, bypassCache: force, ct: ct);
         if (result.Status == GeocodeStatus.Unavailable) return OpResult<PlaceDto>.Invalid("Geocoder unavailable; retry.");
         if (result.Hits.FirstOrDefault() is not { } hit) return OpResult<PlaceDto>.Invalid($"No geocode result for \"{query}\".");
 
@@ -403,6 +428,66 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
             Resolution = outcome.Resolution,
             PlaceId = outcome.Place?.Id,
             Name = outcome.Place?.CanonicalName ?? text.Trim(),
+            Latitude = outcome.Place?.Location?.Y,
+            Longitude = outcome.Place?.Location?.X,
+        });
+    }
+
+    /// <summary>The append-only curation log for a place, oldest first. 404 only when no Places row exists at all —
+    /// tombstoned/merged places keep readable history (that is the audit's point).</summary>
+    public async Task<OpResult<List<CurationEventDto>>> HistoryAsync(Guid id, CancellationToken ct = default)
+    {
+        if (!await db.Places.AnyAsync(p => p.Id == id, ct)) return OpResult<List<CurationEventDto>>.NotFound();
+        var events = await db.CurationLog.AsNoTracking()
+            .Where(x => x.PlaceId == id)
+            .OrderBy(x => x.Seq)
+            .Select(x => new CurationEventDto
+            {
+                Seq = x.Seq,
+                Action = x.Action,
+                ActorPrincipalId = x.ActorPrincipalId,
+                At = x.At,
+                RelatedPlaceId = x.RelatedPlaceId,
+                Detail = x.Detail,
+            })
+            .ToListAsync(ct);
+        return OpResult<List<CurationEventDto>>.Ok(events);
+    }
+
+    /// <summary>Create/dedupe a place from one specific geocode hit picked by OSM identity. Serves the SPA's
+    /// commit path after a forward-geocode preview: the hits are already frozen in the cache, so this re-reads
+    /// them and funnels into the resolver's dedupe — zero extra geocoder calls.</summary>
+    public async Task<OpResult<ResolvePlaceResponse>> CreateFromGeocodeAsync(
+        CreatePlaceFromGeocodeRequest r, Guid createdBy, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(r.Query)) return OpResult<ResolvePlaceResponse>.Invalid("Query is required.");
+        if (string.IsNullOrWhiteSpace(r.OsmType)) return OpResult<ResolvePlaceResponse>.Invalid("OsmType is required.");
+
+        var result = await geocoder.ForwardAsync(r.Query, limit: 5, ct: ct);
+        if (result.Status == GeocodeStatus.Unavailable)
+            return OpResult<ResolvePlaceResponse>.Invalid("Geocoder unavailable; retry.");
+        var hit = result.Hits.FirstOrDefault(h =>
+            h.OsmId == r.OsmId && string.Equals(h.OsmType, r.OsmType, StringComparison.OrdinalIgnoreCase));
+        if (hit is null)
+            return OpResult<ResolvePlaceResponse>.Invalid("That result is not among the geocode hits for this query.");
+
+        var name = string.Join(' ', (r.Name ?? r.Query).Trim().Split((char[]?) null, StringSplitOptions.RemoveEmptyEntries));
+        ResolveOutcome outcome;
+        try
+        {
+            outcome = await resolver.ResolveFromHitAsync(name, hit, createdBy, ct);
+        }
+        catch (DbUpdateException ex)
+        {
+            logger.LogError(ex, "Creating a place from geocode hit {OsmType}/{OsmId} failed to persist.", r.OsmType, r.OsmId);
+            return OpResult<ResolvePlaceResponse>.Conflict("Could not persist the place; a conflicting gazetteer entry may already exist.");
+        }
+
+        return OpResult<ResolvePlaceResponse>.Ok(new ResolvePlaceResponse
+        {
+            Resolution = outcome.Resolution,
+            PlaceId = outcome.Place?.Id,
+            Name = outcome.Place?.CanonicalName ?? name,
             Latitude = outcome.Place?.Location?.Y,
             Longitude = outcome.Place?.Location?.X,
         });

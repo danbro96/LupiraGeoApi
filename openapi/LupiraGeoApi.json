@@ -68,7 +68,7 @@
         "tags": [
           "Places"
         ],
-        "summary": "Search the gazetteer: text (q, trigram), category/kind, containment (withinAreaId), and spatial — proximity (nearLat+nearLon[+radiusM], returns distanceM) or viewport (bbox=minLon&bbox=minLat&bbox=maxLon&bbox=maxLat).",
+        "summary": "Search the gazetteer: text (q, trigram), category/kind, containment (withinAreaId), curation state (hasCoordinates/source/verified — hasCoordinates=false lists unlocated stubs), and spatial — proximity (nearLat+nearLon[+radiusM], returns distanceM) or viewport (bbox=minLon&bbox=minLat&bbox=maxLon&bbox=maxLat).",
         "operationId": "SearchPlaces",
         "parameters": [
           {
@@ -98,6 +98,27 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "hasCoordinates",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/PlaceSource"
+            }
+          },
+          {
+            "name": "verified",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -334,6 +355,52 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/places/{id}/history": {
+      "get": {
+        "tags": [
+          "Places"
+        ],
+        "summary": "The append-only curation log for a place, oldest first. Readable for tombstoned/merged places; 404 only for unknown ids.",
+        "operationId": "GetPlaceHistory",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CurationEventDto"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
           },
           "401": {
             "description": "Unauthorized"
@@ -815,7 +882,7 @@
         "tags": [
           "Places"
         ],
-        "summary": "Re-geocode a place from its address/name and attach coordinates, containment, and OSM id — heals a coordinate-less stub or refreshes a stale fix. 400 on a no-hit or transient geocoder outage; the place is left unchanged.",
+        "summary": "Re-geocode a place from its address/name and attach coordinates, containment, and OSM id — heals a coordinate-less stub or refreshes a stale fix. force=true bypasses and overwrites the frozen geocode cache (heals a frozen empty answer). 400 on a no-hit or transient geocoder outage; the place is left unchanged.",
         "operationId": "RegeocodePlace",
         "parameters": [
           {
@@ -825,6 +892,13 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "force",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
             }
           }
         ],
@@ -990,6 +1064,159 @@
                   "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/ResolvePlaceResponse"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/places/from-geocode": {
+      "post": {
+        "tags": [
+          "Places"
+        ],
+        "summary": "Create/dedupe a place from one specific forward-geocode hit the user picked (query + OSM identity). Reuses the frozen geocode cache — no extra geocoder call. 400 if the hit is not among the query's geocode results.",
+        "operationId": "CreatePlaceFromGeocode",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePlaceFromGeocodeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolvePlaceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/curation/orphans": {
+      "get": {
+        "tags": [
+          "Curation"
+        ],
+        "summary": "Live places nothing references — cross-checked against contact addresses, calendar items (live + deleted counted separately), and saved places. Fails 400 when a reference source is unreachable (never declares orphans on partial data).",
+        "operationId": "FindOrphanPlaces",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OrphanCandidateDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/curation/prune": {
+      "post": {
+        "tags": [
+          "Curation"
+        ],
+        "summary": "Soft-delete orphan places (max 100 per call). References are re-checked per id at prune time; a place referenced since the find returns Referenced and is left alone. Places referenced only by soft-deleted calendar items are never pruned here — use DELETE /places/{id} to override.",
+        "operationId": "PrunePlaces",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrunePlacesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PrunePlaceResultDto"
                   }
                 }
               }
@@ -1490,6 +1717,32 @@
           "Locality"
         ]
       },
+      "CreatePlaceFromGeocodeRequest": {
+        "required": [
+          "query",
+          "osmType",
+          "osmId"
+        ],
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "osmType": {
+            "type": "string"
+          },
+          "osmId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "CreatePlaceRequest": {
         "required": [
           "name"
@@ -1581,6 +1834,64 @@
           }
         }
       },
+      "CurationAction": {
+        "enum": [
+          "Created",
+          "Verified",
+          "Unverified",
+          "Renamed",
+          "Recategorized",
+          "AliasAdded",
+          "AliasRemoved",
+          "Merged",
+          "Regeocoded",
+          "Relocated",
+          "Deleted",
+          "ExternalIdAdded",
+          "ExternalIdRemoved"
+        ]
+      },
+      "CurationEventDto": {
+        "required": [
+          "seq",
+          "action",
+          "at"
+        ],
+        "type": "object",
+        "properties": {
+          "seq": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "action": {
+            "$ref": "#/components/schemas/CurationAction"
+          },
+          "actorPrincipalId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "relatedPlaceId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "ExternalScheme": {
         "enum": [
           "Osm",
@@ -1635,6 +1946,19 @@
               "null",
               "string"
             ]
+          },
+          "osmType": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "osmId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
           }
         }
       },
@@ -1684,6 +2008,71 @@
           "intoPlaceId": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "OrphanCandidateDto": {
+        "required": [
+          "placeId",
+          "name",
+          "kind",
+          "category",
+          "source",
+          "verified",
+          "hasCoordinates",
+          "createdAt",
+          "contactRefs",
+          "calendarLiveRefs",
+          "calendarDeletedRefs",
+          "savedPlaceRefs",
+          "prunable"
+        ],
+        "type": "object",
+        "properties": {
+          "placeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/PlaceKind"
+          },
+          "category": {
+            "$ref": "#/components/schemas/PlaceCategory"
+          },
+          "source": {
+            "$ref": "#/components/schemas/PlaceSource"
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "hasCoordinates": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "contactRefs": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "calendarLiveRefs": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "calendarDeletedRefs": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "savedPlaceRefs": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "prunable": {
+            "type": "boolean"
           }
         }
       },
@@ -1988,6 +2377,50 @@
           }
         }
       },
+      "PrunePlaceResultDto": {
+        "required": [
+          "placeId",
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "placeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PruneStatus"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "PrunePlacesRequest": {
+        "required": [
+          "placeIds"
+        ],
+        "type": "object",
+        "properties": {
+          "placeIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
+      "PruneStatus": {
+        "enum": [
+          "Pruned",
+          "Referenced",
+          "NotFound"
+        ]
+      },
       "ResolvePlaceRequest": {
         "required": [
           "text"
@@ -2231,6 +2664,9 @@
     },
     {
       "name": "Places"
+    },
+    {
+      "name": "Curation"
     },
     {
       "name": "Geocoding"

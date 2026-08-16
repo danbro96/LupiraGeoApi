@@ -15,7 +15,7 @@ public sealed class GeocodeHandler(GeocodingService geocoder)
 
     public async Task<Results<Ok<List<GeocodeResultDto>>, UnauthorizedHttpResult>> ForwardAsync(string q, int? limit, CancellationToken ct)
     {
-        var result = await geocoder.ForwardAsync(q, limit ?? 5, ct);
+        var result = await geocoder.ForwardAsync(q, limit ?? 5, ct: ct);
         return TypedResults.Ok(result.Hits.Select(h => h.ToDto()).ToList());
     }
 }

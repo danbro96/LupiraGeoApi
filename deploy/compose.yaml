@@ -33,6 +33,19 @@ services:
       # Gazetteer seed source (the `--seed-gazetteer` one-shot). Defaults to the public GeoNames dump.
       Geonames__BaseUrl: ${GEONAMES_BASE_URL:-https://download.geonames.org/export/dump}
 
+      # Orphan-sweep reference sources — sibling APIs' /internal seams (service-authed client credentials; the
+      # requested scope must include the audience mapping AND internal:read). Empty = sweep refuses (fail-closed).
+      ContactApi__BaseUrl: ${CONTACT_API_BASE_URL:-}
+      ContactApi__TokenUrl: ${CONTACT_API_TOKEN_URL:-}
+      ContactApi__ClientId: ${CONTACT_API_CLIENT_ID:-}
+      ContactApi__ClientSecret: ${CONTACT_API_CLIENT_SECRET:-}
+      ContactApi__Scope: ${CONTACT_API_SCOPE:-}
+      CalendarApi__BaseUrl: ${CALENDAR_API_BASE_URL:-}
+      CalendarApi__TokenUrl: ${CALENDAR_API_TOKEN_URL:-}
+      CalendarApi__ClientId: ${CALENDAR_API_CLIENT_ID:-}
+      CalendarApi__ClientSecret: ${CALENDAR_API_CLIENT_SECRET:-}
+      CalendarApi__Scope: ${CALENDAR_API_SCOPE:-}
+
       # Self-hosted MapLibre basemap (/basemap: style.json + pmtiles + glyphs/sprites). Empty = surface 404s.
       # Point at a volume holding tiles/basemap.pmtiles, fonts/, sprites/ (see README → Basemap).
       Basemap__AssetsPath: ${BASEMAP_ASSETS_PATH:-}

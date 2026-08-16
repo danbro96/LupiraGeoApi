@@ -19,6 +19,12 @@ public sealed class NominatimStub : IAsyncDisposable
     public int SearchCalls => Volatile.Read(ref _searchCalls);
     public int ReverseCalls => Volatile.Read(ref _reverseCalls);
 
+    /// <summary>Hit/miss mode — mutable so a test can flip an endpoint from empty to answering (heal scenarios).</summary>
+    public bool ReturnResults { get; set; }
+
+    /// <summary>When true, /search answers with two hits instead of one (pick-a-hit scenarios).</summary>
+    public bool MultiHit { get; set; }
+
     private NominatimStub(WebApplication app) => _app = app;
 
     /// <summary>Start a stub. In <paramref name="failStatus"/> mode every request answers with that HTTP status (a
@@ -29,17 +35,18 @@ public sealed class NominatimStub : IAsyncDisposable
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.Logging.ClearProviders();
         var app = builder.Build();
-        var stub = new NominatimStub(app);
+        var stub = new NominatimStub(app) { ReturnResults = returnResults };
 
         app.MapGet("/search", () =>
         {
             Interlocked.Increment(ref stub._searchCalls);
-            return failStatus is { } s ? Results.StatusCode(s) : Results.Content(returnResults ? SearchHit : "[]", "application/json");
+            return failStatus is { } s ? Results.StatusCode(s)
+                : Results.Content(stub.ReturnResults ? (stub.MultiHit ? MultiSearchHit : SearchHit) : "[]", "application/json");
         });
         app.MapGet("/reverse", () =>
         {
             Interlocked.Increment(ref stub._reverseCalls);
-            return failStatus is { } s ? Results.StatusCode(s) : Results.Content(returnResults ? ReverseHit : CountryReverse, "application/json");
+            return failStatus is { } s ? Results.StatusCode(s) : Results.Content(stub.ReturnResults ? ReverseHit : CountryReverse, "application/json");
         });
 
         await app.StartAsync();
@@ -50,6 +57,14 @@ public sealed class NominatimStub : IAsyncDisposable
     public async ValueTask DisposeAsync() => await _app.DisposeAsync();
 
     private const string SearchHit = $"[{ReverseHit}]";
+
+    private const string MultiSearchHit = $"[{ReverseHit},{SecondHit}]";
+
+    private const string SecondHit = """
+        {"lat":"35.6684","lon":"139.6833","display_name":"Shibuya Station, Shibuya, Tokyo, Japan",
+         "name":"Shibuya Station","type":"station","category":"railway","osm_type":"way","osm_id":654321,
+         "address":{"country_code":"jp","country":"Japan","state":"Tokyo","city":"Shibuya"}}
+        """;
 
     private const string ReverseHit = """
         {"lat":"35.6595","lon":"139.7005","display_name":"Shibuya Crossing, Shibuya, Tokyo, Japan",

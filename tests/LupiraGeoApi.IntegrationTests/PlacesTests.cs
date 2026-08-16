@@ -199,4 +199,22 @@ public sealed class PlacesTests(GeoApiTestFactory factory) : IntegrationTest(fac
             new ResolvePlacesBatchRequest { Texts = [.. Enumerable.Range(0, 51).Select(i => $"Place {i}")] });
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
     }
+
+    [Fact]
+    public async Task Curation_filters_select_unlocated_source_and_verified()
+    {
+        var api = Factory.ApiClient(Email);
+        var located = await CreateAsync(api, "Located Cafe", 59.3293, 18.0686);
+        var stub = await CreateAsync(api, "Unlocated Stub");
+        (await api.PatchAsJsonAsync($"/places/{located.Id}", new UpdatePlaceRequest { Verified = true })).EnsureSuccessStatusCode();
+
+        var unlocated = (await api.GetFromJsonAsync<List<PlaceDto>>("/places?hasCoordinates=false"))!;
+        Assert.Equal([stub.Id], unlocated.Select(p => p.Id).ToArray());
+
+        var verified = (await api.GetFromJsonAsync<List<PlaceDto>>("/places?verified=true"))!;
+        Assert.Equal([located.Id], verified.Select(p => p.Id).ToArray());
+
+        var users = (await api.GetFromJsonAsync<List<PlaceDto>>("/places?source=User&hasCoordinates=true"))!;
+        Assert.Equal([located.Id], users.Select(p => p.Id).ToArray());
+    }
 }

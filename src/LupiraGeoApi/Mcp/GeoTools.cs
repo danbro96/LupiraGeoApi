@@ -2,6 +2,7 @@ using System.ComponentModel;
 using LupiraGeoApi.Application;
 using LupiraGeoApi.Auth;
 using LupiraGeoApi.Domain;
+using LupiraGeoApi.Dtos.Curation;
 using LupiraGeoApi.Dtos.Geocoding;
 using LupiraGeoApi.Dtos.Places;
 using LupiraGeoApi.Dtos.SavedPlaces;
@@ -15,7 +16,7 @@ namespace LupiraGeoApi.Mcp;
 /// search/lookup/reverse-geocode; writes cover the import + curation path (forward-geocode, resolve, create, save,
 /// alias, curate). LAN/WireGuard-only (see <see cref="LupiraGeoApi.Endpoints.LanOnlyExposure"/>), so no public write surface.</summary>
 [McpServerToolType]
-public sealed class GeoTools(CurrentUser user, PlaceQueryService places, GeocodingService geocoder, PlaceMergeService merges, SavedPlaceService saved)
+public sealed class GeoTools(CurrentUser user, PlaceQueryService places, GeocodingService geocoder, PlaceMergeService merges, SavedPlaceService saved, PlaceOrphanService orphans)
 {
     [McpServerTool(Name = "find_places"), Description("Search the gazetteer by text and/or proximity; returns matching places with coordinates.")]
     public async Task<List<PlaceDto>> FindPlaces(
@@ -25,7 +26,14 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         [Description("Search radius in metres (default 5000).")] double? radiusM = null,
         [Description("Max results (default 20).")] int? limit = null,
         CancellationToken ct = default) =>
-        Require(await places.SearchAsync(q, null, null, null, nearLat, nearLon, radiusM, null, limit ?? 20, ct));
+        Require(await places.SearchAsync(q, null, null, null, null, null, null, nearLat, nearLon, radiusM, null, limit ?? 20, ct));
+
+    [McpServerTool(Name = "suggest_places"), Description("Typeahead: ranked suggestions over gazetteer places (names + aliases) and seeded localities. Prefix matches rank first, then trigram similarity. q must be at least 2 characters; Locality suggestions are admin-area ids, not place ids.")]
+    public async Task<List<PlaceSuggestionDto>> SuggestPlaces(
+        [Description("Partial name being typed.")] string q,
+        [Description("Max suggestions (default 10).")] int? limit = null,
+        CancellationToken ct = default) =>
+        Require(await places.SuggestAsync(q, limit, ct));
 
     [McpServerTool(Name = "get_place"), Description("Fetch a single place by id, with its containment chain.")]
     public async Task<PlaceDto> GetPlace([Description("Place id.")] Guid id, CancellationToken ct = default) =>
@@ -41,7 +49,7 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         [Description("Text to geocode (e.g. a street address).")] string q,
         [Description("Max candidates (default 5).")] int? limit = null,
         CancellationToken ct = default) =>
-        (await geocoder.ForwardAsync(q, limit ?? 5, ct)).Hits.Select(h => h.ToDto()).ToList();
+        (await geocoder.ForwardAsync(q, limit ?? 5, ct: ct)).Hits.Select(h => h.ToDto()).ToList();
 
     [McpServerTool(Name = "list_saved_places"), Description("List the caller's saved places / personal labels.")]
     public async Task<List<SavedPlaceDto>> ListSavedPlaces(CancellationToken ct = default)
@@ -115,11 +123,38 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         }, u.Id, ct));
     }
 
-    [McpServerTool(Name = "regeocode_place"), Description("Re-run geocoding for an existing place from its address/name and attach the coordinates, containment chain, and OSM id — heals a coordinate-less provisional stub (or refreshes a stale fix). Leaves the place unchanged on a no-hit or a transient geocoder outage.")]
-    public async Task<PlaceDto> RegeocodePlace([Description("Place id.")] Guid id, CancellationToken ct = default)
+    [McpServerTool(Name = "list_unlocated"), Description("Places without coordinates (unhealed provisional stubs and hand-created entries) — the healing worklist. Optionally filter by source (User/Geocoded/Imported) and verified.")]
+    public async Task<List<PlaceDto>> ListUnlocated(
+        [Description("Filter by provenance (optional).")] PlaceSource? source = null,
+        [Description("Filter by verified flag (optional).")] bool? verified = null,
+        [Description("Max results (default 50).")] int? limit = null,
+        CancellationToken ct = default) =>
+        Require(await places.SearchAsync(null, null, null, null, false, source, verified, null, null, null, null, limit, ct));
+
+    [McpServerTool(Name = "find_orphans"), Description("Live places nothing references — cross-checked against contact addresses, calendar items (live + soft-deleted counted separately), and saved places. Prunable=false means only soft-deleted calendar items still reference it. Fails when a reference source is unreachable rather than declaring orphans on partial data.")]
+    public async Task<List<OrphanCandidateDto>> FindOrphans(CancellationToken ct = default) =>
+        Require(await orphans.FindOrphansAsync(ct));
+
+    [McpServerTool(Name = "prune_places"), Description("SOFT-DELETE orphan places (max 100). References are re-checked per id at prune time; anything still referenced (or referenced only by soft-deleted calendar items) is skipped with status Referenced. Not reversible via the API — confirm the ids with find_orphans first.")]
+    public async Task<List<PrunePlaceResultDto>> PrunePlaces(
+        [Description("Place ids to prune (from find_orphans).")] List<Guid> placeIds, CancellationToken ct = default)
     {
         var u = await user.GetAsync(ct);
-        return Require(await places.RegeocodeAsync(id, u.Id, ct));
+        return Require(await orphans.PruneAsync(placeIds, u.Id, ct));
+    }
+
+    [McpServerTool(Name = "get_place_history"), Description("The append-only curation log for a place, oldest first (created/renamed/verified/merged/regeocoded/deleted, with actor and detail). Readable for tombstoned/merged places too.")]
+    public async Task<List<CurationEventDto>> GetPlaceHistory([Description("Place id.")] Guid id, CancellationToken ct = default) =>
+        Require(await places.HistoryAsync(id, ct));
+
+    [McpServerTool(Name = "regeocode_place"), Description("Re-run geocoding for an existing place from its address/name and attach the coordinates, containment chain, and OSM id — heals a coordinate-less provisional stub (or refreshes a stale fix). Leaves the place unchanged on a no-hit or a transient geocoder outage.")]
+    public async Task<PlaceDto> RegeocodePlace(
+        [Description("Place id.")] Guid id,
+        [Description("Bypass and overwrite the frozen geocode cache for this place's query — use when an earlier empty answer was frozen and the place can't heal.")] bool force = false,
+        CancellationToken ct = default)
+    {
+        var u = await user.GetAsync(ct);
+        return Require(await places.RegeocodeAsync(id, u.Id, force, ct));
     }
 
     [McpServerTool(Name = "merge_places"), Description("Merge a duplicate place into the survivor (intoPlaceId): the duplicate's names become aliases, its external ids and saved places move over, and the duplicate id keeps resolving via a tombstone redirect. Use for genuine duplicates — for a WRONG entry with no correct survivor, use delete_place instead (merge would drag the wrong external ids onto the survivor).")]

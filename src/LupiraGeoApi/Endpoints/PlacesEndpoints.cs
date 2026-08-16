@@ -11,11 +11,12 @@ public static class PlacesEndpoints
         var group = app.MapGroup("/places").RequireAuthorization("ApiPolicy").WithTags("Places");
 
         group.MapGet("/", (string? q, PlaceCategory? category, PlaceKind? kind, Guid? withinAreaId,
+                bool? hasCoordinates, PlaceSource? source, bool? verified,
                 double? nearLat, double? nearLon, double? radiusM, double[]? bbox, int? limit,
                 PlacesHandler h, CancellationToken ct) =>
-                h.SearchAsync(q, category, kind, withinAreaId, nearLat, nearLon, radiusM, bbox, limit, ct))
+                h.SearchAsync(q, category, kind, withinAreaId, hasCoordinates, source, verified, nearLat, nearLon, radiusM, bbox, limit, ct))
             .WithName("SearchPlaces")
-            .WithSummary("Search the gazetteer: text (q, trigram), category/kind, containment (withinAreaId), and spatial — proximity (nearLat+nearLon[+radiusM], returns distanceM) or viewport (bbox=minLon&bbox=minLat&bbox=maxLon&bbox=maxLat).")
+            .WithSummary("Search the gazetteer: text (q, trigram), category/kind, containment (withinAreaId), curation state (hasCoordinates/source/verified — hasCoordinates=false lists unlocated stubs), and spatial — proximity (nearLat+nearLon[+radiusM], returns distanceM) or viewport (bbox=minLon&bbox=minLat&bbox=maxLon&bbox=maxLat).")
             .Produces<List<PlaceDto>>(StatusCodes.Status200OK).ProducesProblem(StatusCodes.Status400BadRequest).Produces(StatusCodes.Status401Unauthorized);
 
         group.MapGet("/suggest", (string q, int? limit, PlacesHandler h, CancellationToken ct) => h.SuggestAsync(q, limit, ct))
@@ -28,6 +29,11 @@ public static class PlacesEndpoints
             .WithName("GetPlaceByExternalId")
             .WithSummary("Look a place up by an external gazetteer key, e.g. /places/by-external/Osm/node/123.")
             .Produces<PlaceDto>(StatusCodes.Status200OK).Produces(StatusCodes.Status404NotFound).ProducesProblem(StatusCodes.Status400BadRequest).Produces(StatusCodes.Status401Unauthorized);
+
+        group.MapGet("/{id:guid}/history", (Guid id, PlacesHandler h, CancellationToken ct) => h.HistoryAsync(id, ct))
+            .WithName("GetPlaceHistory")
+            .WithSummary("The append-only curation log for a place, oldest first. Readable for tombstoned/merged places; 404 only for unknown ids.")
+            .Produces<List<CurationEventDto>>(StatusCodes.Status200OK).Produces(StatusCodes.Status404NotFound).Produces(StatusCodes.Status401Unauthorized);
 
         group.MapGet("/{id:guid}", (Guid id, PlacesHandler h, CancellationToken ct) => h.GetAsync(id, ct))
             .WithName("GetPlace")
@@ -69,9 +75,9 @@ public static class PlacesEndpoints
             .WithSummary("Merge a duplicate into the survivor (intoPlaceId): names become aliases, external ids and saved places move over, and the duplicate id keeps resolving via a tombstone redirect.")
             .Produces<PlaceDto>(StatusCodes.Status200OK).Produces(StatusCodes.Status404NotFound).ProducesProblem(StatusCodes.Status400BadRequest).ProducesProblem(StatusCodes.Status409Conflict).Produces(StatusCodes.Status401Unauthorized);
 
-        group.MapPost("/{id:guid}/regeocode", (Guid id, PlacesHandler h, CancellationToken ct) => h.RegeocodeAsync(id, ct))
+        group.MapPost("/{id:guid}/regeocode", (Guid id, bool? force, PlacesHandler h, CancellationToken ct) => h.RegeocodeAsync(id, force ?? false, ct))
             .WithName("RegeocodePlace")
-            .WithSummary("Re-geocode a place from its address/name and attach coordinates, containment, and OSM id — heals a coordinate-less stub or refreshes a stale fix. 400 on a no-hit or transient geocoder outage; the place is left unchanged.")
+            .WithSummary("Re-geocode a place from its address/name and attach coordinates, containment, and OSM id — heals a coordinate-less stub or refreshes a stale fix. force=true bypasses and overwrites the frozen geocode cache (heals a frozen empty answer). 400 on a no-hit or transient geocoder outage; the place is left unchanged.")
             .Produces<PlaceDto>(StatusCodes.Status200OK).Produces(StatusCodes.Status404NotFound).ProducesProblem(StatusCodes.Status400BadRequest).Produces(StatusCodes.Status401Unauthorized);
 
         group.MapDelete("/{id:guid}", (Guid id, PlacesHandler h, CancellationToken ct) => h.DeleteAsync(id, ct))
@@ -93,6 +99,11 @@ public static class PlacesEndpoints
             .WithName("ResolvePlacesBatch")
             .WithSummary("Bulk resolve (max 50 texts); responses align index-for-index with the input.")
             .Produces<List<ResolvePlaceResponse>>(StatusCodes.Status200OK).ProducesProblem(StatusCodes.Status400BadRequest).Produces(StatusCodes.Status401Unauthorized);
+
+        group.MapPost("/from-geocode", (CreatePlaceFromGeocodeRequest r, PlacesHandler h, CancellationToken ct) => h.CreateFromGeocodeAsync(r, ct))
+            .WithName("CreatePlaceFromGeocode")
+            .WithSummary("Create/dedupe a place from one specific forward-geocode hit the user picked (query + OSM identity). Reuses the frozen geocode cache — no extra geocoder call. 400 if the hit is not among the query's geocode results.")
+            .Produces<ResolvePlaceResponse>(StatusCodes.Status200OK).ProducesProblem(StatusCodes.Status400BadRequest).ProducesProblem(StatusCodes.Status409Conflict).Produces(StatusCodes.Status401Unauthorized);
 
         return app;
     }

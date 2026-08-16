@@ -17,4 +17,8 @@ public sealed class GeocodeResultDto
     public string? Country { get; set; }
     public string? Region { get; set; }
     public string? Locality { get; set; }
+
+    /// <summary>OSM identity of the hit (e.g. "way" + 175761024) — the key for <c>POST /places/from-geocode</c>.</summary>
+    public string? OsmType { get; set; }
+    public long? OsmId { get; set; }
 }

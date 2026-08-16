@@ -96,13 +96,16 @@ public sealed class GeocodingService(
         }
     }
 
-    public async Task<ForwardResult> ForwardAsync(string query, int limit = 5, CancellationToken ct = default)
+    /// <summary><paramref name="bypassCache"/> skips only the cache read — whatever answers is written through the
+    /// normal upsert, overwriting a frozen row (the heal path for a frozen empty answer); an <see cref="GeocodeStatus.Unavailable"/>
+    /// outcome writes nothing, so an outage can't destroy a previously good frozen answer.</summary>
+    public async Task<ForwardResult> ForwardAsync(string query, int limit = 5, bool bypassCache = false, CancellationToken ct = default)
     {
         query = query.Trim();
         if (query.Length == 0) return ForwardResult.Empty;
 
         var id = GeocodeCache.ForwardId(query);
-        if (await session.LoadAsync<GeocodeCache>(id, ct) is { } cached)
+        if (!bypassCache && await session.LoadAsync<GeocodeCache>(id, ct) is { } cached)
         {
             using var cdoc = JsonDocument.Parse(cached.Payload);
             return ForwardResult.FromHits(ParseArray(cdoc.RootElement));

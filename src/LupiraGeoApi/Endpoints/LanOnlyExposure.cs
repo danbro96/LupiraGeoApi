@@ -10,7 +10,7 @@ namespace LupiraGeoApi.Endpoints;
 /// </summary>
 internal static class LanOnlyExposure
 {
-    private static readonly string[] LanOnlyPrefixes = ["/mcp", "/.well-known/oauth-protected-resource"];
+    private static readonly string[] LanOnlyPrefixes = ["/mcp", "/curation", "/.well-known/oauth-protected-resource"];
     private static readonly string[] CloudflareHeaders = ["CF-Ray", "CF-Connecting-IP"];
 
     public static IApplicationBuilder UseLanOnlySurfaces(this WebApplication app)

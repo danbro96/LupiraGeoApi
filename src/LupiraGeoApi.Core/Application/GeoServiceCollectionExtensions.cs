@@ -26,6 +26,11 @@ public static class GeoServiceCollectionExtensions
         services.AddScoped<SavedPlaceService>();
         services.AddScoped<AdminAreaService>();
         services.AddScoped<GazetteerImporter>();
+        services.AddScoped<PlaceOrphanService>();
+        // The host overrides these with HTTP clients when ContactApi/CalendarApi are configured; the nulls make
+        // the orphan sweep fail closed instead of failing to resolve.
+        services.TryAddSingleton<IContactPlaceReferences, NullContactPlaceReferences>();
+        services.TryAddSingleton<ICalendarPlaceReferences, NullCalendarPlaceReferences>();
         return services;
     }
 }

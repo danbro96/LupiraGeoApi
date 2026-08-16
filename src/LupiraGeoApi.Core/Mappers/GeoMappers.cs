@@ -61,5 +61,7 @@ public static class GeoMappers
         Country = h.Country,
         Region = h.Region,
         Locality = h.Locality,
+        OsmType = h.OsmType,
+        OsmId = h.OsmId,
     };
 }

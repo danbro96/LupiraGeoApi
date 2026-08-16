@@ -31,3 +31,7 @@ public enum CurationAction { Created, Verified, Unverified, Renamed, Recategoriz
 /// coordinate-less provisional stub was created (address not found), or the geocoder was unreachable so nothing was
 /// created — the last is retryable and must NOT be mistaken for "not found".</summary>
 public enum PlaceResolution { Matched, Geocoded, Provisional, GeocodeUnavailable }
+
+/// <summary>Per-place outcome of an orphan prune: soft-deleted (or already was), skipped because something still
+/// references it, or the id is unknown/merged.</summary>
+public enum PruneStatus { Pruned, Referenced, NotFound }

@@ -33,52 +33,11 @@ public sealed class PlaceResolver(GeoDbContext db, GeocodingService geocoder, Ad
         if (existing is not null) return new ResolveOutcome(existing, PlaceResolution.Matched);
 
         // (2) Forward-geocode. A transient outage stops here — do not create anything.
-        var result = await geocoder.ForwardAsync(name, limit: 1, ct);
+        var result = await geocoder.ForwardAsync(name, limit: 1, ct: ct);
         if (result.Status == GeocodeStatus.Unavailable) return new ResolveOutcome(null, PlaceResolution.GeocodeUnavailable);
 
         if (result.Hits.FirstOrDefault() is { } hit)
-        {
-            var point = new Point(hit.Lon, hit.Lat) { SRID = 4326 };
-            var osmId = hit is { OsmType: { } t, OsmId: { } oid } ? $"{t}/{oid}" : null;
-
-            // Dedup by OSM identity first: one real-world object resolves here under many text forms (a bare name
-            // vs a comma-qualified address), and name+proximity dedup misses them because the canonical name differs.
-            // Without this the second resolve inserts a duplicate (Scheme, Value) and SaveChanges throws on the unique index.
-            if (osmId is not null)
-            {
-                var byOsm = await db.Places.FirstOrDefaultAsync(p => p.MergedIntoId == null && p.DeletedAt == null
-                    && p.ExternalIds.Any(x => x.Scheme == ExternalScheme.Osm && x.Value == osmId), ct);
-                if (byOsm is not null) return new ResolveOutcome(byOsm, PlaceResolution.Matched);
-            }
-
-            var near = await db.Places
-                .Where(p => p.MergedIntoId == null && p.DeletedAt == null && p.Location != null
-                    && p.Location.Distance(point) <= DedupeMeters && EF.Functions.ILike(p.CanonicalName, name))
-                .FirstOrDefaultAsync(ct);
-            if (near is not null) return new ResolveOutcome(near, PlaceResolution.Matched);
-
-            var areaId = await adminAreas.EnsureChainAsync(hit, ct);
-            var place = new Place
-            {
-                Id = Guid.NewGuid(),
-                CanonicalName = name,
-                Kind = PlaceKind.Poi,
-                Category = hit.Category,
-                Location = point,
-                FormattedAddress = hit.DisplayName,
-                WithinAreaId = areaId,
-                Source = PlaceSource.Geocoded,
-                Verified = false,
-                CreatedByPrincipalId = createdBy,
-                CreatedAt = DateTimeOffset.UtcNow,
-            };
-            if (osmId is not null)
-                place.ExternalIds.Add(new PlaceExternalId { Id = Guid.NewGuid(), PlaceId = place.Id, Scheme = ExternalScheme.Osm, Value = osmId });
-            db.Places.Add(place);
-            db.Record(place.Id, CurationAction.Created, createdBy, detail: place.CanonicalName);
-            await db.SaveChangesAsync(ct);
-            return new ResolveOutcome(place, PlaceResolution.Geocoded);
-        }
+            return await ResolveFromHitAsync(name, hit, createdBy, ct);
 
         // (3) Definitive no-hit → provisional user place with no coordinates yet.
         var provisional = new Place
@@ -96,5 +55,52 @@ public sealed class PlaceResolver(GeoDbContext db, GeocodingService geocoder, Ad
         db.Record(provisional.Id, CurationAction.Created, createdBy, detail: provisional.CanonicalName);
         await db.SaveChangesAsync(ct);
         return new ResolveOutcome(provisional, PlaceResolution.Provisional);
+    }
+
+    /// <summary>Land one specific geocode hit as a place: dedupe by OSM identity, then by name+proximity, else create
+    /// a <see cref="PlaceSource.Geocoded"/> place with coordinates and containment. Shared by text resolve (first hit)
+    /// and create-from-geocode (user-picked hit).</summary>
+    internal async Task<ResolveOutcome> ResolveFromHitAsync(string name, GeocodeHit hit, Guid? createdBy, CancellationToken ct)
+    {
+        var point = new Point(hit.Lon, hit.Lat) { SRID = 4326 };
+        var osmId = hit is { OsmType: { } t, OsmId: { } oid } ? $"{t}/{oid}" : null;
+
+        // Dedup by OSM identity first: one real-world object resolves here under many text forms (a bare name
+        // vs a comma-qualified address), and name+proximity dedup misses them because the canonical name differs.
+        // Without this the second resolve inserts a duplicate (Scheme, Value) and SaveChanges throws on the unique index.
+        if (osmId is not null)
+        {
+            var byOsm = await db.Places.FirstOrDefaultAsync(p => p.MergedIntoId == null && p.DeletedAt == null
+                && p.ExternalIds.Any(x => x.Scheme == ExternalScheme.Osm && x.Value == osmId), ct);
+            if (byOsm is not null) return new ResolveOutcome(byOsm, PlaceResolution.Matched);
+        }
+
+        var near = await db.Places
+            .Where(p => p.MergedIntoId == null && p.DeletedAt == null && p.Location != null
+                && p.Location.Distance(point) <= DedupeMeters && EF.Functions.ILike(p.CanonicalName, name))
+            .FirstOrDefaultAsync(ct);
+        if (near is not null) return new ResolveOutcome(near, PlaceResolution.Matched);
+
+        var areaId = await adminAreas.EnsureChainAsync(hit, ct);
+        var place = new Place
+        {
+            Id = Guid.NewGuid(),
+            CanonicalName = name,
+            Kind = PlaceKind.Poi,
+            Category = hit.Category,
+            Location = point,
+            FormattedAddress = hit.DisplayName,
+            WithinAreaId = areaId,
+            Source = PlaceSource.Geocoded,
+            Verified = false,
+            CreatedByPrincipalId = createdBy,
+            CreatedAt = DateTimeOffset.UtcNow,
+        };
+        if (osmId is not null)
+            place.ExternalIds.Add(new PlaceExternalId { Id = Guid.NewGuid(), PlaceId = place.Id, Scheme = ExternalScheme.Osm, Value = osmId });
+        db.Places.Add(place);
+        db.Record(place.Id, CurationAction.Created, createdBy, detail: place.CanonicalName);
+        await db.SaveChangesAsync(ct);
+        return new ResolveOutcome(place, PlaceResolution.Geocoded);
     }
 }

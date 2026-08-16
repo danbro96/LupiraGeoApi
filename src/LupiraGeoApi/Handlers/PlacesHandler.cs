@@ -11,8 +11,9 @@ public sealed class PlacesHandler(PlaceQueryService places, PlaceMergeService me
 {
     public async Task<Results<Ok<List<PlaceDto>>, ProblemHttpResult, UnauthorizedHttpResult>> SearchAsync(
         string? q, PlaceCategory? category, PlaceKind? kind, Guid? withinAreaId,
+        bool? hasCoordinates, PlaceSource? source, bool? verified,
         double? nearLat, double? nearLon, double? radiusM, double[]? bbox, int? limit, CancellationToken ct) =>
-        OpResultMap.OkProblem(await places.SearchAsync(q, category, kind, withinAreaId, nearLat, nearLon, radiusM, bbox, limit, ct));
+        OpResultMap.OkProblem(await places.SearchAsync(q, category, kind, withinAreaId, hasCoordinates, source, verified, nearLat, nearLon, radiusM, bbox, limit, ct));
 
     public async Task<Results<Ok<List<PlaceSuggestionDto>>, ProblemHttpResult, UnauthorizedHttpResult>> SuggestAsync(
         string q, int? limit, CancellationToken ct) =>
@@ -76,10 +77,10 @@ public sealed class PlacesHandler(PlaceQueryService places, PlaceMergeService me
         return OpResultMap.OkNotFoundProblem(await merges.MergeAsync(id, r.IntoPlaceId, u.Id, ct));
     }
 
-    public async Task<Results<Ok<PlaceDto>, NotFound, ProblemHttpResult, UnauthorizedHttpResult>> RegeocodeAsync(Guid id, CancellationToken ct)
+    public async Task<Results<Ok<PlaceDto>, NotFound, ProblemHttpResult, UnauthorizedHttpResult>> RegeocodeAsync(Guid id, bool force, CancellationToken ct)
     {
         var u = await user.GetAsync(ct);
-        return OpResultMap.OkNotFoundProblem(await places.RegeocodeAsync(id, u.Id, ct));
+        return OpResultMap.OkNotFoundProblem(await places.RegeocodeAsync(id, u.Id, force, ct));
     }
 
     public async Task<Results<NoContent, NotFound, ProblemHttpResult, UnauthorizedHttpResult>> DeleteAsync(Guid id, CancellationToken ct)
@@ -100,4 +101,14 @@ public sealed class PlacesHandler(PlaceQueryService places, PlaceMergeService me
         var u = await user.GetAsync(ct);
         return OpResultMap.OkProblem(await places.ResolveBatchAsync(r.Texts, u.Id, ct));
     }
+
+    public async Task<Results<Ok<ResolvePlaceResponse>, ProblemHttpResult, UnauthorizedHttpResult>> CreateFromGeocodeAsync(
+        CreatePlaceFromGeocodeRequest r, CancellationToken ct)
+    {
+        var u = await user.GetAsync(ct);
+        return OpResultMap.OkProblem(await places.CreateFromGeocodeAsync(r, u.Id, ct));
+    }
+
+    public async Task<Results<Ok<List<CurationEventDto>>, NotFound, ProblemHttpResult, UnauthorizedHttpResult>> HistoryAsync(Guid id, CancellationToken ct) =>
+        OpResultMap.OkNotFoundProblem(await places.HistoryAsync(id, ct));
 }

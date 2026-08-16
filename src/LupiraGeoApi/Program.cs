@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 using LupiraGeoApi.Application;
 using LupiraGeoApi.Auth;
 using LupiraGeoApi.Basemap;
+using LupiraGeoApi.Clients;
 using LupiraGeoApi.Data;
 using LupiraGeoApi.Dependencies;
 using LupiraGeoApi.Endpoints;
@@ -36,6 +37,14 @@ builder.Services.AddScoped<PlacesHandler>();
 builder.Services.AddScoped<GeocodeHandler>();
 builder.Services.AddScoped<AdminAreasHandler>();
 builder.Services.AddScoped<SavedPlacesHandler>();
+builder.Services.AddScoped<CurationHandler>();
+
+// --- Place-reference sources for the orphan sweep: sibling APIs' /internal seams (service-authed). Options bind
+// lazily (the client reads BaseUrl per call), so unset config ⇒ IsConfigured=false ⇒ the sweep fails closed. ---
+builder.Services.Configure<ContactApiOptions>(builder.Configuration.GetSection(ContactApiOptions.SectionName));
+builder.Services.AddHttpClient<IContactPlaceReferences, ContactApiClient>();
+builder.Services.Configure<CalendarApiOptions>(builder.Configuration.GetSection(CalendarApiOptions.SectionName));
+builder.Services.AddHttpClient<ICalendarPlaceReferences, CalendarApiClient>();
 
 // Self-hosted MapLibre basemap (style + pmtiles + glyphs/sprites); serves nothing until Basemap:AssetsPath is set.
 builder.Services.Configure<BasemapOptions>(builder.Configuration.GetSection(BasemapOptions.SectionName));
@@ -245,6 +254,7 @@ app.MapDepz();
 app.MapPing();
 app.MapMe();
 app.MapPlaces();
+app.MapCuration();
 app.MapGeocode();
 app.MapAdminAreas();
 app.MapSavedPlaces();
