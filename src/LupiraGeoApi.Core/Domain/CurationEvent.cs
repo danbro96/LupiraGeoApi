@@ -1,4 +1,4 @@
-namespace LupiraGeoApi.Domain;
+namespace LupiraGeoApi.Core.Domain;
 
 /// <summary>
 /// An append-only record of a human/system curation decision on a shared gazetteer <see cref="Place"/> (EF, <c>geo</c>

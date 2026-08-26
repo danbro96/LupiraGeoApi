@@ -1,10 +1,10 @@
-using LupiraGeoApi.Data;
-using LupiraGeoApi.Domain;
-using LupiraGeoApi.Dtos.Curation;
+using LupiraGeoApi.Core.Data;
+using LupiraGeoApi.Core.Domain;
+using LupiraGeoApi.Core.Dtos.Curation;
 using Marten;
 using Microsoft.EntityFrameworkCore;
 
-namespace LupiraGeoApi.Application;
+namespace LupiraGeoApi.Core.Application;
 
 /// <summary>
 /// Cross-service orphan detection and pruning. References live in LupiraContactApi (contact addresses), LupiraCalApi

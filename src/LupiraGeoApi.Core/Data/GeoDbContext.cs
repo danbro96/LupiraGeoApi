@@ -1,7 +1,7 @@
-using LupiraGeoApi.Domain;
+using LupiraGeoApi.Core.Domain;
 using Microsoft.EntityFrameworkCore;
 
-namespace LupiraGeoApi.Data;
+namespace LupiraGeoApi.Core.Data;
 
 /// <summary>
 /// The gazetteer store (EF Core + PostGIS/NetTopologySuite), schema <c>geo</c>: the shared <see cref="Place"/> catalog

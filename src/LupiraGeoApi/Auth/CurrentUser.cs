@@ -1,6 +1,6 @@
 using System.Security.Claims;
-using LupiraGeoApi.Application;
-using LupiraGeoApi.Domain.Identity;
+using LupiraGeoApi.Core.Application;
+using LupiraGeoApi.Core.Domain.Identity;
 
 namespace LupiraGeoApi.Auth;
 

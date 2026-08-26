@@ -1,12 +1,12 @@
 using System.Globalization;
 using System.Net;
 using System.Text.Json;
-using LupiraGeoApi.Domain;
+using LupiraGeoApi.Core.Domain;
 using Marten;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace LupiraGeoApi.Application;
+namespace LupiraGeoApi.Core.Application;
 
 /// <summary>Forward + reverse geocoding, resolve-once-and-freeze into a <see cref="GeocodeCache"/> keyed by a
 /// deterministic id (quantized grid for reverse, normalized query for forward). Tries the self-hosted regional

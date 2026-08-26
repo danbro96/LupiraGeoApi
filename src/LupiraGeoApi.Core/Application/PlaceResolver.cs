@@ -1,9 +1,9 @@
-using LupiraGeoApi.Data;
-using LupiraGeoApi.Domain;
+using LupiraGeoApi.Core.Data;
+using LupiraGeoApi.Core.Domain;
 using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
 
-namespace LupiraGeoApi.Application;
+namespace LupiraGeoApi.Core.Application;
 
 /// <summary>The result of resolving free text: the resulting <see cref="Place"/> (null only when the geocoder was
 /// unreachable) and how it landed. See <see cref="PlaceResolution"/>.</summary>

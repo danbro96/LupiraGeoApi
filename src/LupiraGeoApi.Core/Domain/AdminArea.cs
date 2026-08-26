@@ -1,6 +1,6 @@
 using NetTopologySuite.Geometries;
 
-namespace LupiraGeoApi.Domain;
+namespace LupiraGeoApi.Core.Domain;
 
 /// <summary>
 /// An administrative region (EF Core, <c>geo</c> schema) — Country / Region / Locality — forming the containment tree

@@ -1,6 +1,6 @@
-using LupiraGeoApi.Application;
+using LupiraGeoApi.Core.Application;
 using LupiraGeoApi.Auth;
-using LupiraGeoApi.Dtos.SavedPlaces;
+using LupiraGeoApi.Core.Dtos.SavedPlaces;
 using LupiraGeoApi.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 

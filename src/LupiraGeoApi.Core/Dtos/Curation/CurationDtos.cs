@@ -1,7 +1,7 @@
 using System.Text.Json.Serialization;
-using LupiraGeoApi.Domain;
+using LupiraGeoApi.Core.Domain;
 
-namespace LupiraGeoApi.Dtos.Curation;
+namespace LupiraGeoApi.Core.Dtos.Curation;
 
 /// <summary>A live place nothing references: zero contact addresses, zero live calendar items, zero saved places.
 /// <see cref="Prunable"/> is false when soft-deleted calendar items still reference it — an undelete would dangle.</summary>

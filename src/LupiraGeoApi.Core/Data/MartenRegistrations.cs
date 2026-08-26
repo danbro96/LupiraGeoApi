@@ -1,9 +1,9 @@
-using LupiraGeoApi.Domain;
-using LupiraGeoApi.Domain.Identity;
+using LupiraGeoApi.Core.Domain;
+using LupiraGeoApi.Core.Domain.Identity;
 using Marten;
 using Weasel.Core;
 
-namespace LupiraGeoApi.Data;
+namespace LupiraGeoApi.Core.Data;
 
 /// <summary>Configures the Marten store in the <c>geo_user</c> schema: plain documents for per-principal user state and
 /// caches (identity, saved places, the geocode cache). The gazetteer + admin reference data live in a disjoint <c>geo</c>

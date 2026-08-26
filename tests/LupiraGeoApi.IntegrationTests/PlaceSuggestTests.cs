@@ -1,6 +1,6 @@
-using LupiraGeoApi.Data;
-using LupiraGeoApi.Domain;
-using LupiraGeoApi.Dtos.Places;
+using LupiraGeoApi.Core.Data;
+using LupiraGeoApi.Core.Domain;
+using LupiraGeoApi.Core.Dtos.Places;
 using Microsoft.Extensions.DependencyInjection;
 using NetTopologySuite.Geometries;
 using System.Net.Http.Json;

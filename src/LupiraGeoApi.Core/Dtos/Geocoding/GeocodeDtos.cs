@@ -1,7 +1,7 @@
 using System.Text.Json.Serialization;
-using LupiraGeoApi.Domain;
+using LupiraGeoApi.Core.Domain;
 
-namespace LupiraGeoApi.Dtos.Geocoding;
+namespace LupiraGeoApi.Core.Dtos.Geocoding;
 
 /// <summary>A geocoding hit — a coordinate + display label + best-effort structured address and category. Coarse by
 /// design (coordinates are quantized to the cache grid).</summary>

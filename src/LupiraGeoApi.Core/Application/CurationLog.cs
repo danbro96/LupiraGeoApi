@@ -1,7 +1,7 @@
-using LupiraGeoApi.Data;
-using LupiraGeoApi.Domain;
+using LupiraGeoApi.Core.Data;
+using LupiraGeoApi.Core.Domain;
 
-namespace LupiraGeoApi.Application;
+namespace LupiraGeoApi.Core.Application;
 
 /// <summary>Stages a <see cref="CurationEvent"/> onto the EF change tracker so it commits in the <b>same</b>
 /// <c>SaveChangesAsync</c> as the curation change it describes — the audit can never drift from the data. The

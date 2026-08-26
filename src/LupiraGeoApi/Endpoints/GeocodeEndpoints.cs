@@ -1,4 +1,4 @@
-using LupiraGeoApi.Dtos.Geocoding;
+using LupiraGeoApi.Core.Dtos.Geocoding;
 using LupiraGeoApi.Handlers;
 
 namespace LupiraGeoApi.Endpoints;

@@ -1,4 +1,4 @@
-using LupiraGeoApi.Application;
+using LupiraGeoApi.Core.Application;
 using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace LupiraGeoApi.Http;

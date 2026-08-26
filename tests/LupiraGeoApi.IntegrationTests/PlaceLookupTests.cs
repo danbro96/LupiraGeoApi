@@ -1,4 +1,4 @@
-using LupiraGeoApi.Dtos.Places;
+using LupiraGeoApi.Core.Dtos.Places;
 using System.Net;
 using System.Net.Http.Json;
 using Xunit;

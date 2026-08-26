@@ -1,5 +1,5 @@
 using System.Security.Claims;
-using LupiraGeoApi.Dtos.Ping;
+using LupiraGeoApi.Core.Dtos.Ping;
 
 namespace LupiraGeoApi.Endpoints;
 

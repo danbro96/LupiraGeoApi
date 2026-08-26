@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
-namespace LupiraGeoApi.Data;
+namespace LupiraGeoApi.Core.Data;
 
 /// <summary>
 /// Design-time factory so <c>dotnet ef migrations</c> can build the context without booting the host. Uses a local dev

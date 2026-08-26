@@ -1,5 +1,5 @@
-using LupiraGeoApi.Dtos.Places;
-using LupiraGeoApi.Dtos.SavedPlaces;
+using LupiraGeoApi.Core.Dtos.Places;
+using LupiraGeoApi.Core.Dtos.SavedPlaces;
 using System.Net.Http.Json;
 using System.Net;
 using Xunit;

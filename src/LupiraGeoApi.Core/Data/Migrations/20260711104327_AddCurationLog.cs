@@ -4,7 +4,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace LupiraGeoApi.Data.Migrations
+namespace LupiraGeoApi.Core.Data.Migrations
 {
     /// <inheritdoc />
     public partial class AddCurationLog : Migration

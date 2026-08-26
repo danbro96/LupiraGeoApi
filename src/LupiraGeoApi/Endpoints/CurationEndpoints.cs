@@ -1,4 +1,4 @@
-using LupiraGeoApi.Dtos.Curation;
+using LupiraGeoApi.Core.Dtos.Curation;
 using LupiraGeoApi.Handlers;
 
 namespace LupiraGeoApi.Endpoints;

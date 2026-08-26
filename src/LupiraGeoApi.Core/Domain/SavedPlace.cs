@@ -1,4 +1,4 @@
-namespace LupiraGeoApi.Domain;
+namespace LupiraGeoApi.Core.Domain;
 
 /// <summary>
 /// A per-principal saved place / personal label (Marten document, <c>geo_user</c> schema): "Home", "Work", a star,

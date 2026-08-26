@@ -1,5 +1,5 @@
-using LupiraGeoApi.Domain;
-using LupiraGeoApi.Dtos.AdminAreas;
+using LupiraGeoApi.Core.Domain;
+using LupiraGeoApi.Core.Dtos.AdminAreas;
 using LupiraGeoApi.Handlers;
 
 namespace LupiraGeoApi.Endpoints;

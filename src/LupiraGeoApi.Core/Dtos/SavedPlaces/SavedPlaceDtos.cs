@@ -1,4 +1,4 @@
-namespace LupiraGeoApi.Dtos.SavedPlaces;
+namespace LupiraGeoApi.Core.Dtos.SavedPlaces;
 
 /// <summary>A caller's saved place / personal label. References a gazetteer place, or carries a raw coordinate.</summary>
 public sealed class SavedPlaceDto

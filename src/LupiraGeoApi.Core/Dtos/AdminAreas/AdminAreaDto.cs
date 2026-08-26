@@ -1,7 +1,7 @@
 using System.Text.Json.Serialization;
-using LupiraGeoApi.Domain;
+using LupiraGeoApi.Core.Domain;
 
-namespace LupiraGeoApi.Dtos.AdminAreas;
+namespace LupiraGeoApi.Core.Dtos.AdminAreas;
 
 /// <summary>A node in the administrative containment tree (Country/Region/Locality).</summary>
 public sealed class AdminAreaDto

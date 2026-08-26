@@ -1,4 +1,4 @@
-using LupiraGeoApi.Domain;
+using LupiraGeoApi.Core.Domain;
 using Xunit;
 
 namespace LupiraGeoApi.UnitTests;

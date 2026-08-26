@@ -1,8 +1,8 @@
 using System.Text.Json.Serialization;
-using LupiraGeoApi.Domain;
-using LupiraGeoApi.Dtos.AdminAreas;
+using LupiraGeoApi.Core.Domain;
+using LupiraGeoApi.Core.Dtos.AdminAreas;
 
-namespace LupiraGeoApi.Dtos.Places;
+namespace LupiraGeoApi.Core.Dtos.Places;
 
 /// <summary>A gazetteer place. Coordinates are plain lat/lon on the wire; <c>Containment</c> is the AdminArea chain
 /// outermost→innermost. <c>DistanceM</c> is populated only on proximity (<c>near=</c>) searches.</summary>

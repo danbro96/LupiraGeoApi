@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace LupiraGeoApi.Domain;
+namespace LupiraGeoApi.Core.Domain;
 
 /// <summary>
 /// A resolve-once-and-freeze geocoding cache (Marten document, <c>geo_user</c> schema), keyed by a deterministic id so

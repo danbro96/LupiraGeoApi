@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace LupiraGeoApi.Data.Migrations
+namespace LupiraGeoApi.Core.Data.Migrations
 {
     /// <inheritdoc />
     public partial class AddPlaceDeletedAt : Migration

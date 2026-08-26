@@ -1,7 +1,7 @@
 using System.Text.Json.Serialization;
-using LupiraGeoApi.Domain;
+using LupiraGeoApi.Core.Domain;
 
-namespace LupiraGeoApi.Dtos.Places;
+namespace LupiraGeoApi.Core.Dtos.Places;
 
 /// <summary>One curation-log entry for a place. Readable for tombstoned/merged places too — that is the audit's point.</summary>
 public sealed class CurationEventDto

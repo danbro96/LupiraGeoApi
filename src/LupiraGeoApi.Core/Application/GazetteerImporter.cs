@@ -1,13 +1,13 @@
 using System.Globalization;
 using System.IO.Compression;
-using LupiraGeoApi.Data;
-using LupiraGeoApi.Domain;
+using LupiraGeoApi.Core.Data;
+using LupiraGeoApi.Core.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using NetTopologySuite.Geometries;
 
-namespace LupiraGeoApi.Application;
+namespace LupiraGeoApi.Core.Application;
 
 public sealed record GazetteerImportResult(int Countries, int Regions, int Localities);
 

@@ -1,8 +1,8 @@
-using LupiraGeoApi.Domain.Identity;
+using LupiraGeoApi.Core.Domain.Identity;
 using Marten;
 using Npgsql;
 
-namespace LupiraGeoApi.Application;
+namespace LupiraGeoApi.Core.Application;
 
 /// <summary>
 /// Resolves an authenticated principal (OIDC <c>sub</c> + email) to a local <see cref="Principal"/>,

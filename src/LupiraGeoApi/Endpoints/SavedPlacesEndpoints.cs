@@ -1,4 +1,4 @@
-using LupiraGeoApi.Dtos.SavedPlaces;
+using LupiraGeoApi.Core.Dtos.SavedPlaces;
 using LupiraGeoApi.Handlers;
 
 namespace LupiraGeoApi.Endpoints;

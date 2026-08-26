@@ -1,11 +1,11 @@
-using LupiraGeoApi.Application;
-using LupiraGeoApi.Domain;
-using LupiraGeoApi.Dtos.AdminAreas;
-using LupiraGeoApi.Dtos.Geocoding;
-using LupiraGeoApi.Dtos.Places;
-using LupiraGeoApi.Dtos.SavedPlaces;
+using LupiraGeoApi.Core.Application;
+using LupiraGeoApi.Core.Domain;
+using LupiraGeoApi.Core.Dtos.AdminAreas;
+using LupiraGeoApi.Core.Dtos.Geocoding;
+using LupiraGeoApi.Core.Dtos.Places;
+using LupiraGeoApi.Core.Dtos.SavedPlaces;
 
-namespace LupiraGeoApi.Mappers;
+namespace LupiraGeoApi.Core.Mappers;
 
 public static class GeoMappers
 {

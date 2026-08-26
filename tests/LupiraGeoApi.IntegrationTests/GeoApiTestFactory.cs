@@ -1,4 +1,4 @@
-using LupiraGeoApi.Data;
+using LupiraGeoApi.Core.Data;
 using Marten;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;

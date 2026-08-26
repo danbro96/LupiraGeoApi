@@ -1,6 +1,6 @@
-using LupiraGeoApi.Application;
-using LupiraGeoApi.Domain;
-using LupiraGeoApi.Dtos.AdminAreas;
+using LupiraGeoApi.Core.Application;
+using LupiraGeoApi.Core.Domain;
+using LupiraGeoApi.Core.Dtos.AdminAreas;
 using LupiraGeoApi.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 

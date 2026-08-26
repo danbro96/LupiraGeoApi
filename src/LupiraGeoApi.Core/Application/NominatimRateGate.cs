@@ -1,4 +1,4 @@
-namespace LupiraGeoApi.Application;
+namespace LupiraGeoApi.Core.Application;
 
 /// <summary>Serializes outbound calls to the public Nominatim endpoint: callers queue and each is released no less
 /// than <see cref="MinInterval"/> after the previous one (public usage policy caps at 1 req/s). Singleton, so the

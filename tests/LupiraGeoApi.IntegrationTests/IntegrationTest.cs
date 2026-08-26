@@ -1,5 +1,5 @@
 using Marten;
-using LupiraGeoApi.Dtos.Me;
+using LupiraGeoApi.Core.Dtos.Me;
 using System.Net.Http.Json;
 using Xunit;
 

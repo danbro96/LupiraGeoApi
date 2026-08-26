@@ -1,6 +1,6 @@
 using NetTopologySuite.Geometries;
 
-namespace LupiraGeoApi.Domain;
+namespace LupiraGeoApi.Core.Domain;
 
 /// <summary>
 /// A real-world place in the shared gazetteer (EF Core, <c>geo</c> schema). Identity is a stable <see cref="Id"/>,

@@ -1,9 +1,9 @@
 using System.Text.Json.Serialization;
-using LupiraGeoApi.Application;
+using LupiraGeoApi.Core.Application;
 using LupiraGeoApi.Auth;
 using LupiraGeoApi.Basemap;
 using LupiraGeoApi.Clients;
-using LupiraGeoApi.Data;
+using LupiraGeoApi.Core.Data;
 using LupiraGeoApi.Dependencies;
 using LupiraGeoApi.Endpoints;
 using LupiraGeoApi.Handlers;

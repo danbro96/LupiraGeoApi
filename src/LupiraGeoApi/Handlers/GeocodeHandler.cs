@@ -1,6 +1,6 @@
-using LupiraGeoApi.Application;
-using LupiraGeoApi.Dtos.Geocoding;
-using LupiraGeoApi.Mappers;
+using LupiraGeoApi.Core.Application;
+using LupiraGeoApi.Core.Dtos.Geocoding;
+using LupiraGeoApi.Core.Mappers;
 using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace LupiraGeoApi.Handlers;

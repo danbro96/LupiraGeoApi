@@ -1,12 +1,12 @@
 using System.ComponentModel;
-using LupiraGeoApi.Application;
+using LupiraGeoApi.Core.Application;
 using LupiraGeoApi.Auth;
-using LupiraGeoApi.Domain;
-using LupiraGeoApi.Dtos.Curation;
-using LupiraGeoApi.Dtos.Geocoding;
-using LupiraGeoApi.Dtos.Places;
-using LupiraGeoApi.Dtos.SavedPlaces;
-using LupiraGeoApi.Mappers;
+using LupiraGeoApi.Core.Domain;
+using LupiraGeoApi.Core.Dtos.Curation;
+using LupiraGeoApi.Core.Dtos.Geocoding;
+using LupiraGeoApi.Core.Dtos.Places;
+using LupiraGeoApi.Core.Dtos.SavedPlaces;
+using LupiraGeoApi.Core.Mappers;
 using ModelContextProtocol;
 using ModelContextProtocol.Server;
 

@@ -1,6 +1,6 @@
-using LupiraGeoApi.Domain;
+using LupiraGeoApi.Core.Domain;
 
-namespace LupiraGeoApi.Application;
+namespace LupiraGeoApi.Core.Application;
 
 /// <summary>A geocoding hit: a coordinate + display label + best-effort structured address and category.</summary>
 public sealed record GeocodeHit(

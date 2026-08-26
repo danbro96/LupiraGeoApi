@@ -1,10 +1,10 @@
-using LupiraGeoApi.Data;
-using LupiraGeoApi.Domain;
-using LupiraGeoApi.Dtos.AdminAreas;
-using LupiraGeoApi.Mappers;
+using LupiraGeoApi.Core.Data;
+using LupiraGeoApi.Core.Domain;
+using LupiraGeoApi.Core.Dtos.AdminAreas;
+using LupiraGeoApi.Core.Mappers;
 using Microsoft.EntityFrameworkCore;
 
-namespace LupiraGeoApi.Application;
+namespace LupiraGeoApi.Core.Application;
 
 /// <summary>Browse the administrative reference tree (EF Core, <c>geo</c>): filter by level, parent, or name.</summary>
 public sealed class AdminAreaService(GeoDbContext db)

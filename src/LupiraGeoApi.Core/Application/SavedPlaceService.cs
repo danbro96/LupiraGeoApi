@@ -1,12 +1,12 @@
 using JasperFx; // ConcurrencyException moved here in Marten 9 (JasperFx core).
-using LupiraGeoApi.Data;
-using LupiraGeoApi.Domain;
-using LupiraGeoApi.Dtos.SavedPlaces;
-using LupiraGeoApi.Mappers;
+using LupiraGeoApi.Core.Data;
+using LupiraGeoApi.Core.Domain;
+using LupiraGeoApi.Core.Dtos.SavedPlaces;
+using LupiraGeoApi.Core.Mappers;
 using Marten;
 using Microsoft.EntityFrameworkCore;
 
-namespace LupiraGeoApi.Application;
+namespace LupiraGeoApi.Core.Application;
 
 /// <summary>Per-principal saved places / personal labels (Marten, <c>geo_user</c>). Every operation is scoped to the
 /// calling principal; a saved place owned by someone else reads as <c>NotFound</c>. A saved place either links a
