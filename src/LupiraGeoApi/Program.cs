@@ -290,6 +290,11 @@ if (app.Environment.IsDevelopment())
 // before auth so a tunnelled probe never even receives a challenge.
 app.UseLanOnlySurfaces();
 
+app.UseExceptionHandler();
+// Fills the empty body of a bare 4xx (auth challenges, TypedResults.NotFound) with
+// ProblemDetails, so the spec's promise holds. Scoped away from /mcp — JSON-RPC has its own error shape.
+app.UseWhen(c => !c.Request.Path.StartsWithSegments("/mcp"), b => b.UseStatusCodePages());
+
 app.UseAuthentication();
 app.UseAuthorization();
 
