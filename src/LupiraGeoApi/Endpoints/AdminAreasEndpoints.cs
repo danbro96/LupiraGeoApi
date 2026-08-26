@@ -14,12 +14,12 @@ public static class AdminAreasEndpoints
                 h.ListAsync(level, withinAreaId, q, limit, ct))
             .WithName("ListAdminAreas")
             .WithSummary("Browse the administrative containment tree: filter by level (Country/Region/Locality), parent (withinAreaId), or name (q).")
-            .Produces<List<AdminAreaDto>>(StatusCodes.Status200OK).Produces(StatusCodes.Status401Unauthorized);
+            .Produces<List<AdminAreaDto>>(StatusCodes.Status200OK);
 
         group.MapGet("/{id:guid}", (Guid id, AdminAreasHandler h, CancellationToken ct) => h.GetAsync(id, ct))
             .WithName("GetAdminArea")
             .WithSummary("A single administrative area.")
-            .Produces<AdminAreaDto>(StatusCodes.Status200OK).Produces(StatusCodes.Status404NotFound).Produces(StatusCodes.Status401Unauthorized);
+            .Produces<AdminAreaDto>(StatusCodes.Status200OK).Produces(StatusCodes.Status404NotFound);
 
         return app;
     }
