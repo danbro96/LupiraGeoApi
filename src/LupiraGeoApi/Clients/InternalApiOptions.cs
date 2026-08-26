@@ -15,15 +15,3 @@ public abstract class InternalApiOptions
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(BaseUrl);
 }
-
-/// <summary>Binds <c>ContactApi</c> — the geo → LupiraContactApi hop (place-reference checks for the orphan sweep).</summary>
-public sealed class ContactApiOptions : InternalApiOptions
-{
-    public const string SectionName = "ContactApi";
-}
-
-/// <summary>Binds <c>CalendarApi</c> — the geo → LupiraCalApi hop (place-reference checks for the orphan sweep).</summary>
-public sealed class CalendarApiOptions : InternalApiOptions
-{
-    public const string SectionName = "CalendarApi";
-}

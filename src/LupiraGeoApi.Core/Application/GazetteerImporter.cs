@@ -9,8 +9,6 @@ using NetTopologySuite.Geometries;
 
 namespace LupiraGeoApi.Core.Application;
 
-public sealed record GazetteerImportResult(int Countries, int Regions, int Localities);
-
 /// <summary>
 /// Seeds the administrative reference tree from GeoNames (the <c>--seed-gazetteer</c> one-shot): countries
 /// (<c>countryInfo.txt</c>), regions (<c>admin1CodesASCII.txt</c>), and localities (<c>cities500.zip</c>). Idempotent —

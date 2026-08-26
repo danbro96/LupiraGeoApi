@@ -58,6 +58,7 @@
           "Me"
         ],
         "summary": "The caller's resolved local identity (JIT-provisioned on first login).",
+        "operationId": "WhoAmI",
         "responses": {
           "200": {
             "description": "OK",

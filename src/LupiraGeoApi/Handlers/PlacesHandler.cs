@@ -1,5 +1,5 @@
-using LupiraGeoApi.Core.Application;
 using LupiraGeoApi.Auth;
+using LupiraGeoApi.Core.Application;
 using LupiraGeoApi.Core.Domain;
 using LupiraGeoApi.Core.Dtos.Places;
 using LupiraGeoApi.Http;

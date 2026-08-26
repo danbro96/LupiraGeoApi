@@ -5,10 +5,6 @@ using NetTopologySuite.Geometries;
 
 namespace LupiraGeoApi.Core.Application;
 
-/// <summary>The result of resolving free text: the resulting <see cref="Place"/> (null only when the geocoder was
-/// unreachable) and how it landed. See <see cref="PlaceResolution"/>.</summary>
-public readonly record struct ResolveOutcome(Place? Place, PlaceResolution Resolution);
-
 /// <summary>
 /// Resolves a free-text location to a gazetteer <see cref="Place"/> — the write path that replaces LupiraCalApi's
 /// global exact-string dedup. Strategy: (1) match an existing place by case-insensitive name or alias; (2) else forward-geocode

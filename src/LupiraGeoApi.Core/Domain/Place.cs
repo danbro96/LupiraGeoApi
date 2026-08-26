@@ -42,21 +42,3 @@ public sealed class Place
     public List<PlaceAlias> Aliases { get; set; } = [];
     public List<PlaceExternalId> ExternalIds { get; set; } = [];
 }
-
-/// <summary>An alternate name for a <see cref="Place"/> (translation, colloquialism, former name). Enables "same place, different names".</summary>
-public sealed class PlaceAlias
-{
-    public Guid Id { get; set; }
-    public Guid PlaceId { get; set; }
-    public string Name { get; set; } = "";
-    public string? Lang { get; set; }
-}
-
-/// <summary>A reconciliation key to an external gazetteer, so imports and dedup can match a <see cref="Place"/> across sources.</summary>
-public sealed class PlaceExternalId
-{
-    public Guid Id { get; set; }
-    public Guid PlaceId { get; set; }
-    public ExternalScheme Scheme { get; set; }
-    public string Value { get; set; } = "";
-}

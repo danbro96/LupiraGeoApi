@@ -1,5 +1,5 @@
-using LupiraGeoApi.Core.Application;
 using LupiraGeoApi.Auth;
+using LupiraGeoApi.Core.Application;
 using LupiraGeoApi.Core.Dtos.Curation;
 using LupiraGeoApi.Http;
 using Microsoft.AspNetCore.Http.HttpResults;

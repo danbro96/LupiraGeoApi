@@ -25,7 +25,8 @@ public static class BasemapEndpoints
             var json = await File.ReadAllTextAsync(template, ct);
             ctx.Response.Headers.CacheControl = "private, max-age=300";
             return TypedResults.Text(json.Replace("{BASE}", options.Value.PublicBasePath.TrimEnd('/')), "application/json");
-        });
+        })
+        .WithName("GetBasemapStyle");
 
         group.MapGet("/{**path}", IResult (string path, IOptions<BasemapOptions> options, HttpContext ctx) =>
         {
@@ -33,7 +34,8 @@ public static class BasemapEndpoints
             ctx.Response.Headers.CacheControl = "private, max-age=86400";
             return TypedResults.PhysicalFile(full, ContentType(full),
                 lastModified: File.GetLastWriteTimeUtc(full), enableRangeProcessing: true);
-        });
+        })
+        .WithName("GetBasemap");
 
         return app;
     }

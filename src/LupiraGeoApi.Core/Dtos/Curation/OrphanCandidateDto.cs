@@ -28,18 +28,3 @@ public sealed class OrphanCandidateDto
     public required int SavedPlaceRefs { get; set; }
     public required bool Prunable { get; set; }
 }
-
-public sealed class PrunePlacesRequest
-{
-    public required List<Guid> PlaceIds { get; set; }
-}
-
-public sealed class PrunePlaceResultDto
-{
-    public required Guid PlaceId { get; set; }
-
-    [JsonConverter(typeof(JsonStringEnumConverter<PruneStatus>))]
-    public required PruneStatus Status { get; set; }
-
-    public string? Reason { get; set; }
-}
