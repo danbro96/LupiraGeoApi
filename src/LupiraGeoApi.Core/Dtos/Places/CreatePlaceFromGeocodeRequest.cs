@@ -6,7 +6,9 @@ namespace LupiraGeoApi.Core.Dtos.Places;
 public sealed class CreatePlaceFromGeocodeRequest
 {
     public required string Query { get; set; }
+
     public required string OsmType { get; set; }
+
     public required long OsmId { get; set; }
 
     /// <summary>Canonical name override; defaults to the normalized query text.</summary>

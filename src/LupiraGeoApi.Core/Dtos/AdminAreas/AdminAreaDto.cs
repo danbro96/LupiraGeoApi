@@ -10,9 +10,14 @@ public sealed class AdminAreaDto
 
     [JsonConverter(typeof(JsonStringEnumConverter<AdminLevel>))]
     public required AdminLevel Level { get; set; }
+
     public required string Name { get; set; }
+
     public string? IsoCode { get; set; }
+
     public Guid? WithinAreaId { get; set; }
+
     public double? Latitude { get; set; }
+
     public double? Longitude { get; set; }
 }

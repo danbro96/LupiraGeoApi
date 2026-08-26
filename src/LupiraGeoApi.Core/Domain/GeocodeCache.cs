@@ -11,9 +11,13 @@ namespace LupiraGeoApi.Core.Domain;
 public sealed class GeocodeCache
 {
     public Guid Id { get; set; }
-    public string Kind { get; set; } = "";
-    public string Key { get; set; } = "";
-    public string Payload { get; set; } = "";
+
+    public string Kind { get; set; } = string.Empty;
+
+    public string Key { get; set; } = string.Empty;
+
+    public string Payload { get; set; } = string.Empty;
+
     public DateTimeOffset ResolvedAt { get; set; }
 
     /// <summary>~100 m grid quantization (≈0.001° lat), so one cell shares one reverse entry.</summary>

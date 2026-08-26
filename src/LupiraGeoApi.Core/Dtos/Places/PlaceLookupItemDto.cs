@@ -5,5 +5,6 @@ namespace LupiraGeoApi.Core.Dtos.Places;
 public sealed class PlaceLookupItemDto
 {
     public required Guid RequestedId { get; set; }
+
     public PlaceDto? Place { get; set; }
 }

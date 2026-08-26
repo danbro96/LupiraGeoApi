@@ -15,7 +15,7 @@ public static class DependencyTargets
             new DependencyTarget
             {
                 Name = "nominatim-api",
-                BaseUrl = opts.BaseUrl ?? "",
+                BaseUrl = opts.BaseUrl ?? string.Empty,
                 // A trivially cheap reverse lookup: /status is not exposed by every Nominatim build.
                 ProbePath = "search?format=jsonv2&limit=1&q=a",
                 UserAgent = opts.UserAgent,
@@ -23,7 +23,7 @@ public static class DependencyTargets
             new DependencyTarget
             {
                 Name = "nominatim-public",
-                BaseUrl = opts.FallbackBaseUrl ?? "",
+                BaseUrl = opts.FallbackBaseUrl ?? string.Empty,
                 ProbePath = "search?format=jsonv2&limit=1&q=a",
                 UserAgent = opts.UserAgent,
             },

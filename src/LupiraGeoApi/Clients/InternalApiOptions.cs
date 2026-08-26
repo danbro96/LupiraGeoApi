@@ -6,11 +6,16 @@ namespace LupiraGeoApi.Clients;
 /// <see cref="BaseUrl"/> ⇒ not configured ⇒ the orphan sweep fails closed.</summary>
 public abstract class InternalApiOptions
 {
-    public string BaseUrl { get; set; } = "";
+    public string BaseUrl { get; set; } = string.Empty;
+
     public string? TokenUrl { get; set; }
+
     public string? ClientId { get; set; }
+
     public string? ClientSecret { get; set; }
+
     public string? Scope { get; set; }
+
     public string? DevUser { get; set; }
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(BaseUrl);

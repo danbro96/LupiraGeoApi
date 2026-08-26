@@ -11,13 +11,16 @@ namespace LupiraGeoApi.Core.Domain;
 public sealed class AdminArea
 {
     public Guid Id { get; set; }
+
     public AdminLevel Level { get; set; }
-    public string Name { get; set; } = "";
+
+    public string Name { get; set; } = string.Empty;
 
     /// <summary>ISO 3166-1 alpha-2 for a country; the GeoNames admin1 code for a region; null for a locality.</summary>
     public string? IsoCode { get; set; }
 
     public Guid? WithinAreaId { get; set; }
+
     public AdminArea? WithinArea { get; set; }
 
     /// <summary>Representative point (SRID 4326), stored as PostGIS <c>geography</c>.</summary>

@@ -6,10 +6,16 @@ namespace LupiraGeoApi.Core.Dtos.Places;
 public sealed class CreatePlaceRequest
 {
     public required string Name { get; set; }
+
     public PlaceKind Kind { get; set; } = PlaceKind.Poi;
+
     public PlaceCategory Category { get; set; } = PlaceCategory.Unknown;
+
     public double? Latitude { get; set; }
+
     public double? Longitude { get; set; }
+
     public string? FormattedAddress { get; set; }
+
     public Guid? WithinAreaId { get; set; }
 }

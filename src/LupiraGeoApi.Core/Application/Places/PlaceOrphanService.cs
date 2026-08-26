@@ -26,7 +26,9 @@ public sealed class PlaceOrphanService(
     private sealed record RefCounts(int Contact, int CalendarLive, int CalendarDeleted, int Saved)
     {
         public static readonly RefCounts Zero = new(0, 0, 0, 0);
+
         public bool Unreferenced => Contact == 0 && CalendarLive == 0 && Saved == 0;
+
         public bool Prunable => Unreferenced && CalendarDeleted == 0;
     }
 
@@ -34,8 +36,10 @@ public sealed class PlaceOrphanService(
     {
         var gathered = await GatherReferencesAsync(ct);
         if (gathered is not { } refs)
+        {
             return OpResult<List<OrphanCandidateDto>>.Invalid(
                 "Contact/calendar reference source unavailable — orphan sweep needs complete reference data; retry.");
+        }
 
         var live = await EntityFrameworkQueryableExtensions.ToListAsync(
             db.Places.AsNoTracking().Where(p => p.MergedIntoId == null && p.DeletedAt == null), ct);
@@ -72,8 +76,10 @@ public sealed class PlaceOrphanService(
         // Fresh gather — the concurrent-resolve guard: a place referenced since the find lands as Referenced.
         var gathered = await GatherReferencesAsync(ct);
         if (gathered is not { } refs)
+        {
             return OpResult<List<PrunePlaceResultDto>>.Invalid(
                 "Contact/calendar reference source unavailable — orphan sweep needs complete reference data; retry.");
+        }
 
         var places = await db.Places
             .Where(p => placeIds.Contains(p.Id))

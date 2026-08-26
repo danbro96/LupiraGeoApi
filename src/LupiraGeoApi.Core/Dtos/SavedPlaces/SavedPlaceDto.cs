@@ -4,11 +4,18 @@ namespace LupiraGeoApi.Core.Dtos.SavedPlaces;
 public sealed class SavedPlaceDto
 {
     public required Guid Id { get; set; }
+
     public Guid? PlaceId { get; set; }
+
     public double? Latitude { get; set; }
+
     public double? Longitude { get; set; }
+
     public required string Label { get; set; }
+
     public string? Icon { get; set; }
+
     public string? Notes { get; set; }
+
     public required bool IsFavorite { get; set; }
 }

@@ -14,9 +14,13 @@ public sealed class GeoDbContext(DbContextOptions<GeoDbContext> options) : DbCon
     public const string Schema = "geo";
 
     public DbSet<Place> Places => Set<Place>();
+
     public DbSet<PlaceAlias> PlaceAliases => Set<PlaceAlias>();
+
     public DbSet<PlaceExternalId> PlaceExternalIds => Set<PlaceExternalId>();
+
     public DbSet<AdminArea> AdminAreas => Set<AdminArea>();
+
     public DbSet<CurationEvent> CurationLog => Set<CurationEvent>();
 
     protected override void OnModelCreating(ModelBuilder b)

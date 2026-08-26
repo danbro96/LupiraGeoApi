@@ -25,7 +25,8 @@ public sealed class PlaceResolver(GeoDbContext db, GeocodingService geocoder, Ad
         var name = string.Join(' ', text.Trim().Split((char[]?) null, StringSplitOptions.RemoveEmptyEntries));
 
         // (1) Existing place by case-insensitive name or alias.
-        var existing = await db.Places.FirstOrDefaultAsync(p => p.MergedIntoId == null && p.DeletedAt == null &&
+        var existing = await db.Places.FirstOrDefaultAsync(
+            p => p.MergedIntoId == null && p.DeletedAt == null &&
             (EF.Functions.ILike(p.CanonicalName, name) || p.Aliases.Any(a => EF.Functions.ILike(a.Name, name))), ct);
         if (existing is not null) return new ResolveOutcome(existing, PlaceResolution.Matched);
 
@@ -67,7 +68,8 @@ public sealed class PlaceResolver(GeoDbContext db, GeocodingService geocoder, Ad
         // Without this the second resolve inserts a duplicate (Scheme, Value) and SaveChanges throws on the unique index.
         if (osmId is not null)
         {
-            var byOsm = await db.Places.FirstOrDefaultAsync(p => p.MergedIntoId == null && p.DeletedAt == null
+            var byOsm = await db.Places.FirstOrDefaultAsync(
+                p => p.MergedIntoId == null && p.DeletedAt == null
                 && p.ExternalIds.Any(x => x.Scheme == ExternalScheme.Osm && x.Value == osmId), ct);
             if (byOsm is not null) return new ResolveOutcome(byOsm, PlaceResolution.Matched);
         }

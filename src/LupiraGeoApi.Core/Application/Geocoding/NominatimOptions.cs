@@ -7,6 +7,8 @@ namespace LupiraGeoApi.Core.Application.Geocoding;
 public sealed class NominatimOptions
 {
     public string? BaseUrl { get; set; }
+
     public string? FallbackBaseUrl { get; set; }
+
     public string UserAgent { get; set; } = "LupiraGeoApi/1.0 (+https://github.com/danbro96/LupiraGeoApi)";
 }

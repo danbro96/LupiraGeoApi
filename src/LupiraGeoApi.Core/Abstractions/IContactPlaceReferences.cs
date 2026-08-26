@@ -6,5 +6,6 @@ namespace LupiraGeoApi.Core.Abstractions;
 public interface IContactPlaceReferences
 {
     bool IsConfigured { get; }
+
     Task<IReadOnlyList<PlaceReferenceCount>?> CheckAsync(IReadOnlyList<Guid> placeIds, CancellationToken ct = default);
 }

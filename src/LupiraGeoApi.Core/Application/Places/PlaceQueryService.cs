@@ -78,7 +78,7 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
     /// so cities suggest without a gazetteer entry; a same-name place shadows its locality.</summary>
     public async Task<OpResult<List<PlaceSuggestionDto>>> SuggestAsync(string q, int? limit, CancellationToken ct = default)
     {
-        var term = q?.Trim() ?? "";
+        var term = q?.Trim() ?? string.Empty;
         if (term.Length < 2) return OpResult<List<PlaceSuggestionDto>>.Invalid("q must be at least 2 characters.");
         var take = Math.Clamp(limit ?? 10, 1, MaxSuggestions);
         var prefix = EscapeLike(term) + "%";
@@ -545,7 +545,12 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
             while (cursor is { } cid && walked.Add(cid) && loaded.TryGetValue(cid, out var place))
             {
                 if (place.DeletedAt is not null) break;
-                if (place.MergedIntoId is null) { survivor = place; break; }
+                if (place.MergedIntoId is null)
+                {
+                    survivor = place;
+                    break;
+                }
+
                 cursor = place.MergedIntoId;
             }
 

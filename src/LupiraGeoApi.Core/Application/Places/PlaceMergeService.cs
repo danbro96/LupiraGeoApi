@@ -34,9 +34,11 @@ public sealed class PlaceMergeService(GeoDbContext db, Marten.IDocumentSession s
 
         if (winner.Id == loser.Id) return OpResult<PlaceDto>.Invalid("Cannot merge a place into itself.");
         if (loser.MergedIntoId is { } already)
+        {
             return already == winner.Id
                 ? OpResult<PlaceDto>.Ok(winner.ToDto())
                 : OpResult<PlaceDto>.Conflict("Place is already merged into a different place.");
+        }
 
         foreach (var alias in loser.Aliases)
             AddWinnerAlias(winner, alias.Name, alias.Lang);

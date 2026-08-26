@@ -7,5 +7,6 @@ public sealed class PlaceExternalIdDto
 {
     [JsonConverter(typeof(JsonStringEnumConverter<ExternalScheme>))]
     public required ExternalScheme Scheme { get; set; }
+
     public required string Value { get; set; }
 }

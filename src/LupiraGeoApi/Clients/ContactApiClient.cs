@@ -17,6 +17,7 @@ public sealed class ContactApiClient(HttpClient http, IOptions<ContactApiOptions
     private sealed class ContactRef
     {
         public Guid PlaceId { get; set; }
+
         public int Count { get; set; }
     }
 }

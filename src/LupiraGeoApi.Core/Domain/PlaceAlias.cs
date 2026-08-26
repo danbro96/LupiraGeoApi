@@ -4,7 +4,10 @@ namespace LupiraGeoApi.Core.Domain;
 public sealed class PlaceAlias
 {
     public Guid Id { get; set; }
+
     public Guid PlaceId { get; set; }
-    public string Name { get; set; } = "";
+
+    public string Name { get; set; } = string.Empty;
+
     public string? Lang { get; set; }
 }

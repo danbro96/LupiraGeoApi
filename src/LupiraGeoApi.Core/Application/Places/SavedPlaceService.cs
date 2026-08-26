@@ -60,8 +60,18 @@ public sealed class SavedPlaceService(IDocumentSession session, GeoDbContext db)
             return OpResult<SavedPlaceDto>.Invalid("Provide either placeId or latitude/longitude, not both.");
         if (r is { Latitude: not null, Longitude: null } or { Latitude: null, Longitude: not null })
             return OpResult<SavedPlaceDto>.Invalid("Latitude and longitude must be supplied together.");
-        if (r.PlaceId is { } pid) { saved.PlaceId = pid; saved.RawLat = null; saved.RawLon = null; }
-        else if (r is { Latitude: { } lat, Longitude: { } lon }) { saved.RawLat = lat; saved.RawLon = lon; saved.PlaceId = null; }
+        if (r.PlaceId is { } pid)
+        {
+            saved.PlaceId = pid;
+            saved.RawLat = null;
+            saved.RawLon = null;
+        }
+        else if (r is { Latitude: { } lat, Longitude: { } lon })
+        {
+            saved.RawLat = lat;
+            saved.RawLon = lon;
+            saved.PlaceId = null;
+        }
 
         if (r.Label is { } label)
         {
@@ -75,8 +85,14 @@ public sealed class SavedPlaceService(IDocumentSession session, GeoDbContext db)
         saved.UpdatedAt = DateTimeOffset.UtcNow;
         session.Store(saved);
         // Optimistic concurrency: another device modifying this doc between our load and save throws.
-        try { await session.SaveChangesAsync(ct); }
-        catch (ConcurrencyException) { return OpResult<SavedPlaceDto>.Conflict("Saved place was modified concurrently; reload and retry."); }
+        try
+        {
+            await session.SaveChangesAsync(ct);
+        }
+        catch (ConcurrencyException)
+        {
+            return OpResult<SavedPlaceDto>.Conflict("Saved place was modified concurrently; reload and retry.");
+        }
 
         return OpResult<SavedPlaceDto>.Ok(await ToDtoAsync(saved, ct));
     }

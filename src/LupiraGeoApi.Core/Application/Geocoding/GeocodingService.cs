@@ -22,6 +22,7 @@ public sealed class GeocodingService(
     public const string FallbackClientName = "nominatim-fallback";
 
     private string? PrimaryUrl => Normalize(options.Value.BaseUrl);
+
     private string? FallbackUrl => Normalize(options.Value.FallbackBaseUrl);
 
     // An empty env var binds over the option's default — fall back to it rather than sending a blank UA.
@@ -50,12 +51,21 @@ public sealed class GeocodingService(
                 var doc = await GetAsync(client, baseUrl + pathQuery, ct);
                 // No usable object (a truly out-of-coverage instance can answer "Unable to geocode", no lat).
                 if (doc is null || doc.RootElement.ValueKind != JsonValueKind.Object
-                                || !doc.RootElement.TryGetProperty("lat", out _)) { doc?.Dispose(); continue; }
+                                || !doc.RootElement.TryGetProperty("lat", out _))
+                                {
+                                    doc?.Dispose();
+                    continue;
+                                }
 
                 // The regional instance country-matches every out-of-coverage point via Nominatim's worldwide
                 // country_osm_grid — a bare country centroid, not a real fix. Keep it only as a last resort and let
                 // the public fallback answer with street detail; freeze the coarse hit only if nothing better comes.
-                if (IsCountryLevel(doc.RootElement)) { coarse?.Dispose(); coarse = doc; continue; }
+                if (IsCountryLevel(doc.RootElement))
+                {
+                    coarse?.Dispose();
+                    coarse = doc;
+                    continue;
+                }
 
                 var hit = ParseHit(doc.RootElement);
                 await CacheAsync(id, "reverse", $"{qlat},{qlon}", doc.RootElement, ct);
@@ -101,7 +111,11 @@ public sealed class GeocodingService(
             foreach (var (client, baseUrl) in Endpoints())
             {
                 var fetch = await GetAsync(client, baseUrl + pathQuery, ct);
-                if (fetch is null) { anyFailure = true; continue; } // transport failure after retries
+                if (fetch is null)
+                {
+                    anyFailure = true;
+                    continue;
+                } // transport failure after retries
 
                 var hits = ParseArray(fetch.RootElement);
                 if (hits.Count > 0)
@@ -208,7 +222,7 @@ public sealed class GeocodingService(
     {
         if (el.ValueKind != JsonValueKind.Object) return null;
         if (!TryDouble(el, "lat", out var lat) || !TryDouble(el, "lon", out var lon)) return null;
-        var display = Str(el, "display_name") ?? Str(el, "name") ?? "";
+        var display = Str(el, "display_name") ?? Str(el, "name") ?? string.Empty;
 
         string? cc = null, country = null, region = null, locality = null;
         if (el.TryGetProperty("address", out var a) && a.ValueKind == JsonValueKind.Object)

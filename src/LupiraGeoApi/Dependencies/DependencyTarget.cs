@@ -5,7 +5,10 @@ namespace LupiraGeoApi.Dependencies;
 public sealed class DependencyTarget
 {
     public required string Name { get; set; }
+
     public required string BaseUrl { get; set; }
+
     public required string ProbePath { get; set; }
+
     public string? UserAgent { get; set; }
 }

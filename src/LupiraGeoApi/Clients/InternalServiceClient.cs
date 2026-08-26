@@ -96,7 +96,10 @@ public abstract class InternalServiceClient(HttpClient http, InternalApiOptions 
         }
     }
 
-    private sealed class CheckRequest { public required List<Guid> PlaceIds { get; set; } }
+    private sealed class CheckRequest
+    {
+        public required List<Guid> PlaceIds { get; set; }
+    }
 
     protected sealed class PlaceRefsEnvelope<TRef>
     {
@@ -105,7 +108,10 @@ public abstract class InternalServiceClient(HttpClient http, InternalApiOptions 
 
     private sealed class TokenResponse
     {
-        [JsonPropertyName("access_token")] public string? AccessToken { get; set; }
-        [JsonPropertyName("expires_in")] public int? ExpiresIn { get; set; }
+        [JsonPropertyName("access_token")]
+        public string? AccessToken { get; set; }
+
+        [JsonPropertyName("expires_in")]
+        public int? ExpiresIn { get; set; }
     }
 }

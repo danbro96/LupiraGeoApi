@@ -17,7 +17,9 @@ public sealed class CalendarApiClient(HttpClient http, IOptions<CalendarApiOptio
     private sealed class ItemRef
     {
         public Guid PlaceId { get; set; }
+
         public int LiveCount { get; set; }
+
         public int DeletedCount { get; set; }
     }
 }

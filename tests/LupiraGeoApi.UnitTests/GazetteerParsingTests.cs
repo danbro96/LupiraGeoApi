@@ -10,8 +10,11 @@ public sealed class GazetteerParsingTests
     public void ParseCountry_reads_iso_name_geonameid_and_skips_comments()
     {
         Assert.Null(GazetteerImporter.ParseCountry("# comment"));
-        var row = new[] { "SE", "SWE", "752", "SW", "Sweden", "Stockholm", "449964", "10000000", "EU", ".se",
-            "SEK", "Krona", "46", "###  ##", "", "sv", "2661886", "NO,FI", "" };
+        var row = new[]
+        {
+            "SE", "SWE", "752", "SW", "Sweden", "Stockholm", "449964", "10000000", "EU", ".se",
+            "SEK", "Krona", "46", "###  ##", string.Empty, "sv", "2661886", "NO,FI", string.Empty,
+        };
         var c = GazetteerImporter.ParseCountry(string.Join('\t', row));
         Assert.NotNull(c);
         Assert.Equal("SE", c!.Value.Iso);
@@ -33,8 +36,13 @@ public sealed class GazetteerParsingTests
     public void ParseCity_reads_coords_country_and_admin1()
     {
         var f = new string[19];
-        f[0] = "2673730"; f[1] = "Stockholm"; f[4] = "59.33258"; f[5] = "18.0649";
-        f[8] = "SE"; f[10] = "26"; f[14] = "1515017";
+        f[0] = "2673730";
+        f[1] = "Stockholm";
+        f[4] = "59.33258";
+        f[5] = "18.0649";
+        f[8] = "SE";
+        f[10] = "26";
+        f[14] = "1515017";
         var city = GazetteerImporter.ParseCity(string.Join('\t', f));
         Assert.NotNull(city);
         Assert.Equal("Stockholm", city!.Value.Name);

@@ -9,16 +9,24 @@ namespace LupiraGeoApi.Core.Domain;
 public sealed class SavedPlace
 {
     public Guid Id { get; set; }
+
     public Guid PrincipalId { get; set; }
 
     public Guid? PlaceId { get; set; }
+
     public double? RawLat { get; set; }
+
     public double? RawLon { get; set; }
 
-    public string Label { get; set; } = "";
+    public string Label { get; set; } = string.Empty;
+
     public string? Icon { get; set; }
+
     public string? Notes { get; set; }
+
     public bool IsFavorite { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
+
     public DateTimeOffset UpdatedAt { get; set; }
 }

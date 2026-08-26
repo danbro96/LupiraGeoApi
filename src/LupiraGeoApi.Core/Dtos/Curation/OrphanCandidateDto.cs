@@ -8,6 +8,7 @@ namespace LupiraGeoApi.Core.Dtos.Curation;
 public sealed class OrphanCandidateDto
 {
     public required Guid PlaceId { get; set; }
+
     public required string Name { get; set; }
 
     [JsonConverter(typeof(JsonStringEnumConverter<PlaceKind>))]
@@ -20,11 +21,18 @@ public sealed class OrphanCandidateDto
     public required PlaceSource Source { get; set; }
 
     public required bool Verified { get; set; }
+
     public required bool HasCoordinates { get; set; }
+
     public required DateTimeOffset CreatedAt { get; set; }
+
     public required int ContactRefs { get; set; }
+
     public required int CalendarLiveRefs { get; set; }
+
     public required int CalendarDeletedRefs { get; set; }
+
     public required int SavedPlaceRefs { get; set; }
+
     public required bool Prunable { get; set; }
 }

@@ -120,7 +120,9 @@ public sealed class GazetteerImporter(GeoDbContext db, IConfiguration config, IL
     // ---- parsing (pure, testable) ----
 
     internal readonly record struct CountryRow(string Iso, string Name, long GeonamesId);
+
     internal readonly record struct Admin1Row(string Code, string Name, long GeonamesId);
+
     internal readonly record struct CityRow(long GeonamesId, string Name, double Lat, double Lon, string CountryCode, string Admin1);
 
     internal static CountryRow? ParseCountry(string line)

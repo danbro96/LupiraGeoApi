@@ -6,5 +6,6 @@ namespace LupiraGeoApi.Core.Abstractions;
 public interface ICalendarPlaceReferences
 {
     bool IsConfigured { get; }
+
     Task<IReadOnlyList<CalendarPlaceReference>?> CheckAsync(IReadOnlyList<Guid> placeIds, CancellationToken ct = default);
 }

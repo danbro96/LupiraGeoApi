@@ -59,6 +59,10 @@ public sealed class AdminAreaService(GeoDbContext db)
 
         return deepest.Id;
 
-        AdminArea Add(AdminArea a) { db.AdminAreas.Add(a); return a; }
+        AdminArea Add(AdminArea a)
+        {
+            db.AdminAreas.Add(a);
+            return a;
+        }
     }
 }

@@ -8,10 +8,16 @@ namespace LupiraGeoApi.Core.Dtos.Places;
 public sealed class UpdatePlaceRequest
 {
     public string? Name { get; set; }
+
     public PlaceCategory? Category { get; set; }
+
     public bool? Verified { get; set; }
+
     public double? Latitude { get; set; }
+
     public double? Longitude { get; set; }
+
     public string? FormattedAddress { get; set; }
+
     public Guid? WithinAreaId { get; set; }
 }

@@ -12,7 +12,10 @@ public sealed class CurationEventDto
     public required CurationAction Action { get; set; }
 
     public Guid? ActorPrincipalId { get; set; }
+
     public required DateTimeOffset At { get; set; }
+
     public Guid? RelatedPlaceId { get; set; }
+
     public string? Detail { get; set; }
 }
