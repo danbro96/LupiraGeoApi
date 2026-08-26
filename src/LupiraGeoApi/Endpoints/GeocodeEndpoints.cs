@@ -12,7 +12,7 @@ public static class GeocodeEndpoints
         group.MapGet("/reverse", (double lat, double lon, GeocodeHandler h, CancellationToken ct) => h.ReverseAsync(lat, lon, ct))
             .WithName("ReverseGeocode")
             .WithSummary("Coordinate → coarse label + structured address (cached; coordinates quantized to a ~100 m grid).")
-            .Produces<GeocodeResultDto>(StatusCodes.Status200OK).Produces(StatusCodes.Status404NotFound);
+            .Produces<GeocodeResultDto>(StatusCodes.Status200OK).ProducesProblem(StatusCodes.Status404NotFound);
 
         group.MapGet("/forward", (string q, int? limit, GeocodeHandler h, CancellationToken ct) => h.ForwardAsync(q, limit, ct))
             .WithName("ForwardGeocode")

@@ -19,7 +19,7 @@ public static class AdminAreasEndpoints
         group.MapGet("/{id:guid}", (Guid id, AdminAreasHandler h, CancellationToken ct) => h.GetAsync(id, ct))
             .WithName("GetAdminArea")
             .WithSummary("A single administrative area.")
-            .Produces<AdminAreaDto>(StatusCodes.Status200OK).Produces(StatusCodes.Status404NotFound);
+            .Produces<AdminAreaDto>(StatusCodes.Status200OK).ProducesProblem(StatusCodes.Status404NotFound);
 
         return app;
     }

@@ -22,12 +22,12 @@ public static class SavedPlacesEndpoints
         group.MapPatch("/{id:guid}", (Guid id, UpdateSavedPlaceRequest r, SavedPlacesHandler h, CancellationToken ct) => h.UpdateAsync(id, r, ct))
             .WithName("UpdateSavedPlace")
             .WithSummary("Rename, re-icon, annotate, or (un)favorite a saved place.")
-            .Produces<SavedPlaceDto>(StatusCodes.Status200OK).Produces(StatusCodes.Status404NotFound).ProducesProblem(StatusCodes.Status400BadRequest);
+            .Produces<SavedPlaceDto>(StatusCodes.Status200OK).ProducesProblem(StatusCodes.Status404NotFound).ProducesProblem(StatusCodes.Status400BadRequest);
 
         group.MapDelete("/{id:guid}", (Guid id, SavedPlacesHandler h, CancellationToken ct) => h.DeleteAsync(id, ct))
             .WithName("DeleteSavedPlace")
             .WithSummary("Remove a saved place.")
-            .Produces(StatusCodes.Status204NoContent).Produces(StatusCodes.Status404NotFound);
+            .Produces(StatusCodes.Status204NoContent).ProducesProblem(StatusCodes.Status404NotFound);
 
         return app;
     }
