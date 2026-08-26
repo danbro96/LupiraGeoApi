@@ -1,38 +1,12 @@
+using System.Net;
+using System.Net.Http.Json;
 using LupiraGeoApi.Core.Domain;
 using LupiraGeoApi.Core.Dtos.Curation;
 using LupiraGeoApi.Core.Dtos.Places;
 using LupiraGeoApi.Core.Dtos.SavedPlaces;
-using System.Net.Http.Json;
-using System.Net;
 using Xunit;
 
 namespace LupiraGeoApi.IntegrationTests;
-
-/// <summary>Own collection: the factory points ContactApi/CalendarApi at a <see cref="PlaceRefsStub"/>.</summary>
-public sealed class OrphanSweepFixture : IAsyncLifetime
-{
-    public PlaceRefsStub Refs { get; private set; } = null!;
-    public GeoApiTestFactory Factory { get; private set; } = null!;
-
-    public async Task InitializeAsync()
-    {
-        Refs = await PlaceRefsStub.StartAsync();
-        Factory = new GeoApiTestFactory();
-        Factory.ExtraConfig["ContactApi:BaseUrl"] = Refs.BaseUrl;
-        Factory.ExtraConfig["ContactApi:DevUser"] = "geo-svc@x.test";
-        Factory.ExtraConfig["CalendarApi:BaseUrl"] = Refs.BaseUrl;
-        Factory.ExtraConfig["CalendarApi:DevUser"] = "geo-svc@x.test";
-    }
-
-    public async Task DisposeAsync()
-    {
-        await Factory.DisposeAsync();
-        await Refs.DisposeAsync();
-    }
-}
-
-[CollectionDefinition("orphan-sweep")]
-public sealed class OrphanSweepCollection : ICollectionFixture<OrphanSweepFixture>;
 
 [Collection("orphan-sweep")]
 public sealed class OrphanSweepTests(OrphanSweepFixture fx) : IAsyncLifetime
@@ -181,17 +155,6 @@ public sealed class OrphanSweepTests(OrphanSweepFixture fx) : IAsyncLifetime
         await CreateAsync(api, "Forgotten Bench");
         fx.Refs.FailCalendar = true;
 
-        Assert.Equal(HttpStatusCode.BadRequest, (await api.GetAsync("/curation/orphans")).StatusCode);
-    }
-}
-
-/// <summary>Against the shared factory (ContactApi/CalendarApi unset): the sweep must refuse, not report orphans.</summary>
-public sealed class OrphanSweepUnconfiguredTests(GeoApiTestFactory factory) : IntegrationTest(factory)
-{
-    [Fact]
-    public async Task Unconfigured_reference_sources_fail_closed()
-    {
-        var api = Factory.ApiClient("alice@x.test");
         Assert.Equal(HttpStatusCode.BadRequest, (await api.GetAsync("/curation/orphans")).StatusCode);
     }
 }

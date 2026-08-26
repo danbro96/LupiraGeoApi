@@ -1,7 +1,7 @@
+using System.Net;
+using System.Net.Http.Json;
 using LupiraGeoApi.Core.Dtos.Places;
 using LupiraGeoApi.Core.Dtos.SavedPlaces;
-using System.Net.Http.Json;
-using System.Net;
 using Xunit;
 
 namespace LupiraGeoApi.IntegrationTests;
@@ -13,7 +13,10 @@ public sealed class SavedPlacesTests(GeoApiTestFactory factory) : IntegrationTes
     {
         var resp = await api.PostAsJsonAsync("/me/places", new CreateSavedPlaceRequest
         {
-            Label = label, Latitude = 59.33, Longitude = 18.06, IsFavorite = favorite,
+            Label = label,
+            Latitude = 59.33,
+            Longitude = 18.06,
+            IsFavorite = favorite,
         });
         resp.EnsureSuccessStatusCode();
         return (await resp.Content.ReadFromJsonAsync<SavedPlaceDto>())!;

@@ -1,10 +1,10 @@
+using System.Net;
+using System.Net.Http.Json;
 using LupiraGeoApi.Core.Data;
 using LupiraGeoApi.Core.Domain;
 using LupiraGeoApi.Core.Dtos.Places;
 using Microsoft.Extensions.DependencyInjection;
 using NetTopologySuite.Geometries;
-using System.Net.Http.Json;
-using System.Net;
 using Xunit;
 
 namespace LupiraGeoApi.IntegrationTests;
@@ -29,8 +29,11 @@ public sealed class PlaceSuggestTests(GeoApiTestFactory factory) : IntegrationTe
         db.AdminAreas.Add(region);
         db.AdminAreas.Add(new AdminArea
         {
-            Id = Guid.NewGuid(), Level = AdminLevel.Locality, Name = name,
-            WithinAreaId = region.Id, Centroid = new Point(lon, lat) { SRID = 4326 },
+            Id = Guid.NewGuid(),
+            Level = AdminLevel.Locality,
+            Name = name,
+            WithinAreaId = region.Id,
+            Centroid = new Point(lon, lat) { SRID = 4326 },
         });
         await db.SaveChangesAsync();
     }

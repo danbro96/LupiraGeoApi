@@ -1,6 +1,6 @@
-using Marten;
-using LupiraGeoApi.Core.Dtos.Me;
 using System.Net.Http.Json;
+using LupiraGeoApi.Core.Dtos.Me;
+using Marten;
 using Xunit;
 
 namespace LupiraGeoApi.IntegrationTests;
