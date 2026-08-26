@@ -13,7 +13,6 @@ using Marten;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
@@ -136,8 +135,7 @@ builder.Logging.AddOpenTelemetry(o =>
     if (!string.IsNullOrWhiteSpace(otlpEndpoint)) o.AddOtlpExporter();
 });
 
-builder.Services.AddHealthChecks()
-    .AddCheck<DatabaseReadyCheck>("postgres", tags: ["ready"]);
+builder.Services.AddAppHealthChecks();
 
 // Non-gating dependency probe (/depz): the geocoder edges, on a dedicated client so probe traffic
 // never rides the throttled fallback geocoder.
@@ -243,11 +241,7 @@ app.MapGet("/", () => TypedResults.Redirect("/scalar"))
    .ExcludeFromDescription()
    .AllowAnonymous();
 
-// Health probes: /livez = liveness (no dependency checks); /readyz = readiness (Postgres reachable).
-app.MapHealthChecks("/livez", new HealthCheckOptions { Predicate = _ => false })
-    .DisableHttpMetrics();
-app.MapHealthChecks("/readyz", new HealthCheckOptions { Predicate = c => c.Tags.Contains("ready") })
-    .DisableHttpMetrics();
+app.MapAppHealthChecks();
 
 // REST surface.
 app.MapDepz();
