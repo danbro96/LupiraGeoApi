@@ -6,7 +6,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
-    <RootNamespace>LupiraGeoApi.IntegrationTests</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
