@@ -25,7 +25,24 @@
             }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -53,7 +70,24 @@
             }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -190,7 +224,24 @@
             }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -237,7 +288,24 @@
             }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -297,7 +365,24 @@
             }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -344,7 +429,14 @@
             }
           },
           "404": {
-            "description": "Not Found"
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           },
           "400": {
             "description": "Bad Request",
@@ -357,7 +449,24 @@
             }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -400,10 +509,34 @@
             }
           },
           "404": {
-            "description": "Not Found"
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -443,10 +576,34 @@
             }
           },
           "404": {
-            "description": "Not Found"
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -494,7 +651,14 @@
             }
           },
           "404": {
-            "description": "Not Found"
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           },
           "400": {
             "description": "Bad Request",
@@ -507,7 +671,24 @@
             }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -538,10 +719,34 @@
             "description": "No Content"
           },
           "404": {
-            "description": "Not Found"
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -591,7 +796,14 @@
             }
           },
           "404": {
-            "description": "Not Found"
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           },
           "400": {
             "description": "Bad Request",
@@ -614,7 +826,24 @@
             }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -656,10 +885,34 @@
             "description": "No Content"
           },
           "404": {
-            "description": "Not Found"
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -709,7 +962,14 @@
             }
           },
           "404": {
-            "description": "Not Found"
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           },
           "400": {
             "description": "Bad Request",
@@ -732,7 +992,24 @@
             }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -781,7 +1058,14 @@
             "description": "No Content"
           },
           "404": {
-            "description": "Not Found"
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           },
           "400": {
             "description": "Bad Request",
@@ -794,7 +1078,24 @@
             }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -844,7 +1145,14 @@
             }
           },
           "404": {
-            "description": "Not Found"
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           },
           "400": {
             "description": "Bad Request",
@@ -867,7 +1175,24 @@
             }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -914,7 +1239,14 @@
             }
           },
           "404": {
-            "description": "Not Found"
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           },
           "400": {
             "description": "Bad Request",
@@ -927,7 +1259,24 @@
             }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -979,7 +1328,24 @@
             }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1028,7 +1394,24 @@
             }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1080,7 +1463,24 @@
             }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1139,7 +1539,24 @@
             }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1181,7 +1598,24 @@
             }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1233,7 +1667,24 @@
             }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1282,10 +1733,34 @@
             }
           },
           "404": {
-            "description": "Not Found"
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1335,7 +1810,24 @@
             }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1399,7 +1891,24 @@
             }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1439,10 +1948,34 @@
             }
           },
           "404": {
-            "description": "Not Found"
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1474,7 +2007,24 @@
             }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1521,7 +2071,24 @@
             }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1571,7 +2138,14 @@
             }
           },
           "404": {
-            "description": "Not Found"
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           },
           "400": {
             "description": "Bad Request",
@@ -1584,7 +2158,24 @@
             }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1615,10 +2206,34 @@
             "description": "No Content"
           },
           "404": {
-            "description": "Not Found"
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           },
           "401": {
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1661,7 +2276,8 @@
           "value": {
             "type": "string"
           }
-        }
+        },
+        "description": "Attach an external gazetteer id to a place. Multiple ids per scheme are allowed (e.g. an OSM `way/`\n            and `node/`). The `(Scheme, Value)` pair is globally unique — attaching one that already belongs to\n            another place is a conflict (merge those places instead)."
       },
       "AdminAreaDto": {
         "required": [
@@ -1708,14 +2324,16 @@
             ],
             "format": "double"
           }
-        }
+        },
+        "description": "A node in the administrative containment tree (Country/Region/Locality)."
       },
       "AdminLevel": {
         "enum": [
           "Country",
           "Region",
           "Locality"
-        ]
+        ],
+        "description": "Level of an AdminArea in the containment tree (Locality → Region → Country)."
       },
       "CreatePlaceFromGeocodeRequest": {
         "required": [
@@ -1739,9 +2357,11 @@
             "type": [
               "null",
               "string"
-            ]
+            ],
+            "description": "Canonical name override; defaults to the normalized query text."
           }
-        }
+        },
+        "description": "Create/dedupe a place from one specific forward-geocode hit the user picked, identified by OSM identity.\n            The hit must be among the (cached) geocode results for string CreatePlaceFromGeocodeRequest.Query — the preview call froze them, so this\n            costs no extra geocoder round trip."
       },
       "CreatePlaceRequest": {
         "required": [
@@ -1785,7 +2405,8 @@
             ],
             "format": "uuid"
           }
-        }
+        },
+        "description": "Create a user place directly (name + optional coordinates/category)."
       },
       "CreateSavedPlaceRequest": {
         "required": [
@@ -1849,7 +2470,8 @@
           "Deleted",
           "ExternalIdAdded",
           "ExternalIdRemoved"
-        ]
+        ],
+        "description": "A curation decision recorded on a Place in the append-only `curation_log`. Stable names —\n            they are the future event-type names, so never rename a member (add new ones; keep old ones readable)."
       },
       "CurationEventDto": {
         "required": [
@@ -1890,7 +2512,8 @@
               "string"
             ]
           }
-        }
+        },
+        "description": "One curation-log entry for a place. Readable for tombstoned/merged places too — that is the audit's point."
       },
       "ExternalScheme": {
         "enum": [
@@ -1898,7 +2521,8 @@
           "Wikidata",
           "Google",
           "Geonames"
-        ]
+        ],
+        "description": "External identity system a PlaceExternalId reconciles against."
       },
       "GeocodeResultDto": {
         "required": [
@@ -1951,7 +2575,8 @@
             "type": [
               "null",
               "string"
-            ]
+            ],
+            "description": "OSM identity of the hit (e.g. \"way\" + 175761024) — the key for `POST /places/from-geocode`."
           },
           "osmId": {
             "type": [
@@ -1960,7 +2585,8 @@
             ],
             "format": "int64"
           }
-        }
+        },
+        "description": "A geocoding hit — a coordinate + display label + best-effort structured address and category. Coarse by\n            design (coordinates are quantized to the cache grid)."
       },
       "LookupPlacesRequest": {
         "required": [
@@ -1975,7 +2601,8 @@
               "format": "uuid"
             }
           }
-        }
+        },
+        "description": "Bulk get-by-ids (max 200) — hydrates place ids other services store (calendar items, contact addresses)\n            into coordinates in one call. Duplicates are allowed; responses align index-for-index with the input."
       },
       "MeDto": {
         "required": [
@@ -1997,7 +2624,8 @@
               "string"
             ]
           }
-        }
+        },
+        "description": "The resolved local identity of the caller."
       },
       "MergePlaceRequest": {
         "required": [
@@ -2009,7 +2637,8 @@
             "type": "string",
             "format": "uuid"
           }
-        }
+        },
+        "description": "Merge the addressed place into Guid MergePlaceRequest.IntoPlaceId (the survivor). The addressed id becomes a\n            tombstone redirect, so ids held by other services keep resolving."
       },
       "OrphanCandidateDto": {
         "required": [
@@ -2074,7 +2703,8 @@
           "prunable": {
             "type": "boolean"
           }
-        }
+        },
+        "description": "A live place nothing references: zero contact addresses, zero live calendar items, zero saved places.\n            bool OrphanCandidateDto.Prunable is false when soft-deleted calendar items still reference it — an undelete would dangle."
       },
       "PingDto": {
         "required": [
@@ -2098,7 +2728,8 @@
               "string"
             ]
           }
-        }
+        },
+        "description": "The claims a caller's token resolved to, echoed for cross-service auth-seam probes.\n            Returning the audiences (not a bare 200) lets a failing consumer see which half of the seam\n            is misconfigured."
       },
       "PlaceAliasDto": {
         "required": [
@@ -2147,7 +2778,8 @@
           "Government",
           "Worship",
           "Other"
-        ]
+        ],
+        "description": "Semantic type of a place — drives filtering and iconography. Kept vendor-neutral and coarse; extend as needed."
       },
       "PlaceDto": {
         "required": [
@@ -2231,7 +2863,8 @@
               "$ref": "#/components/schemas/PlaceExternalIdDto"
             }
           }
-        }
+        },
+        "description": "A gazetteer place. Coordinates are plain lat/lon on the wire; `Containment` is the AdminArea chain\n            outermost→innermost. `DistanceM` is populated only on proximity (`near=`) searches."
       },
       "PlaceExternalIdDto": {
         "required": [
@@ -2252,7 +2885,8 @@
         "enum": [
           "Poi",
           "Address"
-        ]
+        ],
+        "description": "What a Place is: a point-of-interest (a named venue/entity) or a plain street address."
       },
       "PlaceLookupItemDto": {
         "required": [
@@ -2274,7 +2908,8 @@
               }
             ]
           }
-        }
+        },
+        "description": "`Place` is null when the id is unknown or soft-deleted; on a merge redirect it is the survivor\n        (`Place.Id != RequestedId`). Containment is omitted — `GET /places/{id}` remains the detail call."
       },
       "PlaceResolution": {
         "enum": [
@@ -2282,14 +2917,16 @@
           "Geocoded",
           "Provisional",
           "GeocodeUnavailable"
-        ]
+        ],
+        "description": "How Place resolution landed: an existing entry matched, a fresh geocode created one, a\n            coordinate-less provisional stub was created (address not found), or the geocoder was unreachable so nothing was\n            created — the last is retryable and must NOT be mistaken for \"not found\"."
       },
       "PlaceSource": {
         "enum": [
           "User",
           "Geocoded",
           "Imported"
-        ]
+        ],
+        "description": "Provenance of a gazetteer entry: created by a user (may be unverified), derived from geocoding, or imported from a gazetteer."
       },
       "PlaceSuggestionDto": {
         "required": [
@@ -2339,7 +2976,8 @@
               "string"
             ]
           }
-        }
+        },
+        "description": "A typeahead suggestion: a gazetteer place (name/alias trigram match) or an AdminArea locality — cities come\n            from the GeoNames seed, so they suggest without anyone having geocoded a POI there. `Context` disambiguates\n            (formatted address for places, parent area for localities)."
       },
       "ProblemDetails": {
         "type": "object",
@@ -2374,8 +3012,15 @@
               "null",
               "string"
             ]
+          },
+          "traceId": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
-        }
+        },
+        "description": "RFC 9457 problem details."
       },
       "PrunePlaceResultDto": {
         "required": [
@@ -2419,7 +3064,8 @@
           "Pruned",
           "Referenced",
           "NotFound"
-        ]
+        ],
+        "description": "Per-place outcome of an orphan prune: soft-deleted (or already was), skipped because something still\n            references it, or the id is unknown/merged."
       },
       "ResolvePlaceRequest": {
         "required": [
@@ -2430,7 +3076,8 @@
           "text": {
             "type": "string"
           }
-        }
+        },
+        "description": "Resolve free-text to a place id — match an existing entry, geocode, or provisionally create. This is what\n            LupiraCalApi calls when an item/travel-leg/contact address carries a location string."
       },
       "ResolvePlaceResponse": {
         "required": [
@@ -2447,6 +3094,7 @@
               "null",
               "string"
             ],
+            "description": "Null only when PlaceResolution ResolvePlaceResponse.Resolution is PlaceResolution.GeocodeUnavailable — the\n            geocoder was unreachable and nothing was created; the item is retryable.",
             "format": "uuid"
           },
           "name": {
@@ -2480,7 +3128,8 @@
               "type": "string"
             }
           }
-        }
+        },
+        "description": "Bulk ResolvePlaceRequest — for imports. Responses align index-for-index with the input."
       },
       "SavedPlaceDto": {
         "required": [
@@ -2533,13 +3182,15 @@
           "isFavorite": {
             "type": "boolean"
           }
-        }
+        },
+        "description": "A caller's saved place / personal label. References a gazetteer place, or carries a raw coordinate."
       },
       "SuggestionType": {
         "enum": [
           "Place",
           "Locality"
-        ]
+        ],
+        "description": "What a typeahead suggestion points at: a gazetteer SuggestionType.Place or an AdminArea locality."
       },
       "UpdatePlaceRequest": {
         "type": "object",
@@ -2593,7 +3244,8 @@
             ],
             "format": "uuid"
           }
-        }
+        },
+        "description": "Curate a place: rename, recategorize, verify, or correct its location. Omitted members are left unchanged.\n            `Latitude`+`Longitude` (both required together) move the point — for fixing a wrong geocode by hand;\n            `WithinAreaId` re-anchors containment to match."
       },
       "UpdateSavedPlaceRequest": {
         "type": "object",
@@ -2643,7 +3295,8 @@
               "boolean"
             ]
           }
-        }
+        },
+        "description": "Update a saved place. Omitted members are left unchanged. Re-point the target by passing EITHER\n            `PlaceId` (link a gazetteer place; clears any raw coordinate) OR `Latitude`+`Longitude` together\n            (set a raw coordinate; clears any link) — not both. There is no \"clear to nothing\": drop a link by re-pointing\n            to a raw coordinate."
       }
     },
     "securitySchemes": {
