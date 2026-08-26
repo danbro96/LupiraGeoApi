@@ -20,9 +20,9 @@ namespace LupiraGeoApi.Mcp;
 [McpServerToolType]
 public sealed class GeoTools(CurrentUser user, PlaceQueryService places, GeocodingService geocoder, PlaceMergeService merges, SavedPlaceService saved, PlaceOrphanService orphans)
 {
-    [McpServerTool(Name = "find_places")]
+    [McpServerTool(Name = "search_places")]
     [Description("Search the gazetteer by text and/or proximity; returns matching places with coordinates.")]
-    public async Task<List<PlaceDto>> FindPlaces(
+    public async Task<List<PlaceDto>> SearchPlaces(
         [Description("Free-text query (place name).")] string? q = null,
         [Description("Latitude for a proximity search.")] double? nearLat = null,
         [Description("Longitude for a proximity search.")] double? nearLon = null,
@@ -145,15 +145,15 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         CancellationToken ct = default) =>
         Require(await places.SearchAsync(null, null, null, null, false, source, verified, null, null, null, null, limit, ct));
 
-    [McpServerTool(Name = "find_orphans")]
+    [McpServerTool(Name = "list_orphans")]
     [Description("Live places nothing references — cross-checked against contact addresses, calendar items (live + soft-deleted counted separately), and saved places. Prunable=false means only soft-deleted calendar items still reference it. Fails when a reference source is unreachable rather than declaring orphans on partial data.")]
-    public async Task<List<OrphanCandidateDto>> FindOrphans(CancellationToken ct = default) =>
+    public async Task<List<OrphanCandidateDto>> ListOrphans(CancellationToken ct = default) =>
         Require(await orphans.FindOrphansAsync(ct));
 
     [McpServerTool(Name = "prune_places")]
-    [Description("SOFT-DELETE orphan places (max 100). References are re-checked per id at prune time; anything still referenced (or referenced only by soft-deleted calendar items) is skipped with status Referenced. Not reversible via the API — confirm the ids with find_orphans first.")]
+    [Description("SOFT-DELETE orphan places (max 100). References are re-checked per id at prune time; anything still referenced (or referenced only by soft-deleted calendar items) is skipped with status Referenced. Not reversible via the API — confirm the ids with list_orphans first.")]
     public async Task<List<PrunePlaceResultDto>> PrunePlaces(
-        [Description("Place ids to prune (from find_orphans).")] List<Guid> placeIds, CancellationToken ct = default)
+        [Description("Place ids to prune (from list_orphans).")] List<Guid> placeIds, CancellationToken ct = default)
     {
         var u = await user.GetAsync(ct);
         return Require(await orphans.PruneAsync(placeIds, u.Id, ct));
