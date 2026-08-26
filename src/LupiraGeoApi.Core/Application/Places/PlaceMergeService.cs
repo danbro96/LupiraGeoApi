@@ -1,10 +1,11 @@
+using LupiraGeoApi.Core.Application.Results;
 using LupiraGeoApi.Core.Data;
 using LupiraGeoApi.Core.Domain;
 using LupiraGeoApi.Core.Dtos.Places;
 using LupiraGeoApi.Core.Mappers;
 using Microsoft.EntityFrameworkCore;
 
-namespace LupiraGeoApi.Core.Application;
+namespace LupiraGeoApi.Core.Application.Places;
 
 /// <summary>Merges a duplicate place into a survivor. The loser becomes a tombstone redirect
 /// (<see cref="Place.MergedIntoId"/>) so place ids held by other services keep resolving: names move over as aliases,

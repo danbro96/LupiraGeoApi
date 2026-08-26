@@ -1,4 +1,4 @@
-namespace LupiraGeoApi.Core.Application;
+namespace LupiraGeoApi.Core.Application.Geocoding;
 
 /// <summary>Outcome of a forward geocode. <c>Ok</c> carries hits; <c>Empty</c> is a definitive "no such place"
 /// (safe to freeze/provision); <c>Unavailable</c> means no endpoint could be reached (transport error/timeout/429/5xx

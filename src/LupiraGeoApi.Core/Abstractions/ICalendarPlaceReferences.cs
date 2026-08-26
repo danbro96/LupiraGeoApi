@@ -1,4 +1,4 @@
-namespace LupiraGeoApi.Core.Application;
+namespace LupiraGeoApi.Core.Abstractions;
 
 /// <summary>How many calendar items reference each of the given place ids, split live/soft-deleted
 /// (LupiraCalApi's <c>/internal/items/place-references:check</c> seam). Null = the source is unreachable —

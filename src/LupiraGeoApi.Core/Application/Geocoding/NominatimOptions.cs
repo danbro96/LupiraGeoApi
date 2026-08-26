@@ -1,4 +1,4 @@
-namespace LupiraGeoApi.Core.Application;
+namespace LupiraGeoApi.Core.Application.Geocoding;
 
 /// <summary>The <c>Nominatim</c> config section. <see cref="BaseUrl"/> is the self-hosted regional instance,
 /// <see cref="FallbackBaseUrl"/> an optional public endpoint tried when the primary is unset or yields nothing —

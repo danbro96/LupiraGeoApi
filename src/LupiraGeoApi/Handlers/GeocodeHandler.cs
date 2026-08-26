@@ -1,4 +1,4 @@
-using LupiraGeoApi.Core.Application;
+using LupiraGeoApi.Core.Application.Geocoding;
 using LupiraGeoApi.Core.Dtos.Geocoding;
 using LupiraGeoApi.Core.Mappers;
 using Microsoft.AspNetCore.Http.HttpResults;

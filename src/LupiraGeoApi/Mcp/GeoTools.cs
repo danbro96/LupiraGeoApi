@@ -1,6 +1,8 @@
 using System.ComponentModel;
 using LupiraGeoApi.Auth;
-using LupiraGeoApi.Core.Application;
+using LupiraGeoApi.Core.Application.Geocoding;
+using LupiraGeoApi.Core.Application.Places;
+using LupiraGeoApi.Core.Application.Results;
 using LupiraGeoApi.Core.Domain;
 using LupiraGeoApi.Core.Dtos.Curation;
 using LupiraGeoApi.Core.Dtos.Geocoding;

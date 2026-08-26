@@ -1,4 +1,4 @@
-namespace LupiraGeoApi.Core.Application;
+namespace LupiraGeoApi.Core.Abstractions;
 
 public sealed class NullCalendarPlaceReferences : ICalendarPlaceReferences
 {

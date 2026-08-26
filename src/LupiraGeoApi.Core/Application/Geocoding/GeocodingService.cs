@@ -6,7 +6,7 @@ using Marten;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace LupiraGeoApi.Core.Application;
+namespace LupiraGeoApi.Core.Application.Geocoding;
 
 /// <summary>Forward + reverse geocoding, resolve-once-and-freeze into a <see cref="GeocodeCache"/> keyed by a
 /// deterministic id (quantized grid for reverse, normalized query for forward). Tries the self-hosted regional

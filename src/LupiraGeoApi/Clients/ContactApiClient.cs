@@ -1,4 +1,4 @@
-using LupiraGeoApi.Core.Application;
+using LupiraGeoApi.Core.Abstractions;
 using Microsoft.Extensions.Options;
 
 namespace LupiraGeoApi.Clients;

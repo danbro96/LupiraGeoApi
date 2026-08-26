@@ -1,3 +1,3 @@
-namespace LupiraGeoApi.Core.Application;
+namespace LupiraGeoApi.Core.Abstractions;
 
 public sealed record PlaceReferenceCount(Guid PlaceId, int Count);

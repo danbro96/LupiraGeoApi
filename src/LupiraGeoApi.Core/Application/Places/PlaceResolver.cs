@@ -1,9 +1,10 @@
+using LupiraGeoApi.Core.Application.Geocoding;
 using LupiraGeoApi.Core.Data;
 using LupiraGeoApi.Core.Domain;
 using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
 
-namespace LupiraGeoApi.Core.Application;
+namespace LupiraGeoApi.Core.Application.Places;
 
 /// <summary>
 /// Resolves a free-text location to a gazetteer <see cref="Place"/> — the write path that replaces LupiraCalApi's

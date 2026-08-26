@@ -1,4 +1,4 @@
-namespace LupiraGeoApi.Core.Application;
+namespace LupiraGeoApi.Core.Application.Geocoding;
 
 public sealed record ForwardResult(GeocodeStatus Status, IReadOnlyList<GeocodeHit> Hits)
 {

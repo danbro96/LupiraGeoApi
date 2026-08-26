@@ -1,4 +1,7 @@
-using LupiraGeoApi.Core.Application;
+using LupiraGeoApi.Core.Abstractions;
+using LupiraGeoApi.Core.Application.Gazetteer;
+using LupiraGeoApi.Core.Application.Geocoding;
+using LupiraGeoApi.Core.Application.Places;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Microsoft.Extensions.DependencyInjection;

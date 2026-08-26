@@ -1,4 +1,4 @@
-namespace LupiraGeoApi.Core.Application;
+namespace LupiraGeoApi.Core.Abstractions;
 
 /// <summary>How many contact addresses reference each of the given place ids (LupiraContactApi's
 /// <c>/internal/contacts/place-references:check</c> seam). Null = the source is unreachable — the orphan sweep

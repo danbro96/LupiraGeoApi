@@ -7,7 +7,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using NetTopologySuite.Geometries;
 
-namespace LupiraGeoApi.Core.Application;
+namespace LupiraGeoApi.Core.Application.Gazetteer;
 
 /// <summary>
 /// Seeds the administrative reference tree from GeoNames (the <c>--seed-gazetteer</c> one-shot): countries

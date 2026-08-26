@@ -1,4 +1,6 @@
 using System.Globalization;
+using LupiraGeoApi.Core.Application.Geocoding;
+using LupiraGeoApi.Core.Application.Results;
 using LupiraGeoApi.Core.Data;
 using LupiraGeoApi.Core.Domain;
 using LupiraGeoApi.Core.Dtos.AdminAreas;
@@ -8,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using NetTopologySuite.Geometries;
 
-namespace LupiraGeoApi.Core.Application;
+namespace LupiraGeoApi.Core.Application.Places;
 
 /// <summary>Read/write over the gazetteer (EF Core + PostGIS): text + spatial search, typeahead suggest, a full single
 /// place with its alias/external-id/containment detail, direct create, curation, and alias management. Reads by id

@@ -1,4 +1,4 @@
-using LupiraGeoApi.Core.Application;
+using LupiraGeoApi.Core.Application.Gazetteer;
 using Xunit;
 
 namespace LupiraGeoApi.UnitTests;

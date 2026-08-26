@@ -1,4 +1,4 @@
-using LupiraGeoApi.Core.Application;
+using LupiraGeoApi.Core.Application.Places;
 using LupiraGeoApi.Core.Domain;
 using LupiraGeoApi.Core.Dtos.AdminAreas;
 using LupiraGeoApi.Http;

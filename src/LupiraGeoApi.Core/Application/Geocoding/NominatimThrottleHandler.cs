@@ -1,4 +1,4 @@
-namespace LupiraGeoApi.Core.Application;
+namespace LupiraGeoApi.Core.Application.Geocoding;
 
 /// <summary>Applies the <see cref="NominatimRateGate"/> to every request on the fallback HttpClient pipeline.</summary>
 public sealed class NominatimThrottleHandler(NominatimRateGate gate) : DelegatingHandler

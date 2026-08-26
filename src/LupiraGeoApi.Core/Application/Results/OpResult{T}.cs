@@ -1,4 +1,4 @@
-namespace LupiraGeoApi.Core.Application;
+namespace LupiraGeoApi.Core.Application.Results;
 
 /// <summary>A value-returning operation outcome.</summary>
 public readonly record struct OpResult<T>(OpStatus Status, T? Value, string? Error)

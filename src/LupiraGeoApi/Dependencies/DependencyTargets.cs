@@ -1,4 +1,4 @@
-using LupiraGeoApi.Core.Application;
+using LupiraGeoApi.Core.Application.Geocoding;
 using Microsoft.Extensions.Options;
 
 namespace LupiraGeoApi.Dependencies;
