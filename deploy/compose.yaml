@@ -29,6 +29,8 @@ services:
       # cached forever (resolve-once). Set the User-Agent to identify YOUR deployment per the public usage policy.
       Nominatim__FallbackBaseUrl: ${NOMINATIM_FALLBACK_BASE_URL:-}
       Nominatim__UserAgent: ${NOMINATIM_USER_AGENT:-}
+      # ISO codes your extract covers (CSV, e.g. SE,NO). Bare one-word queries need a notable hit; lower bar here.
+      Nominatim__RegionalCountries: ${NOMINATIM_REGIONAL_COUNTRIES:-}
 
       # Gazetteer seed source (the `--seed-gazetteer` one-shot). Defaults to the public GeoNames dump.
       Geonames__BaseUrl: ${GEONAMES_BASE_URL:-https://download.geonames.org/export/dump}

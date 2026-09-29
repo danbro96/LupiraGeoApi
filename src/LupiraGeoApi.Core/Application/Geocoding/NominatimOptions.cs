@@ -11,4 +11,7 @@ public sealed class NominatimOptions
     public string? FallbackBaseUrl { get; set; }
 
     public string UserAgent { get; set; } = "LupiraGeoApi/1.0 (+https://github.com/danbro96/LupiraGeoApi)";
+
+    /// <summary>CSV of ISO alpha-2 codes the regional extract covers (e.g. <c>SE,NO</c>); unset ⇒ all foreign.</summary>
+    public string? RegionalCountries { get; set; }
 }

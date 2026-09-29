@@ -138,7 +138,10 @@ deterministic id so retries upsert. Two endpoints, tried in order (`NominatimOpt
 instance (`Nominatim:BaseUrl`), then an optional public fallback (`Nominatim:FallbackBaseUrl`) for queries outside the
 regional extract's coverage — throttled through `NominatimRateGate` (singleton, ≥1.1 s between requests, per the
 public usage policy) with an identifying `Nominatim:UserAgent`. Whichever endpoint answers is frozen, so a foreign
-query costs one public call ever. Any failure or no configured URL returns empty/null and never blocks a resolve.
+query costs one public call ever. Forward hits must pass `ForwardHitFilter` or count as a miss (so the next endpoint is
+asked): a 5-digit postcode in the query must share the hit's first two digits, and a bare one-word query needs
+Nominatim importance ≥ 0.2 inside `Nominatim:RegionalCountries`, ≥ 0.5 elsewhere. Forward fetches 10 candidates so a
+passing hit below a rejected one is still found. Any failure or no configured URL returns empty/null and never blocks a resolve.
 
 ## Reference-data seed
 

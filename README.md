@@ -37,6 +37,8 @@ dotnet test tests/LupiraGeoApi.IntegrationTests   # integration (Testcontainers 
 Geocoding is optional: set `Nominatim__BaseUrl` to enable it (unset → resolver provisions user places, no external call).
 `Nominatim__FallbackBaseUrl` adds a public fallback for out-of-coverage queries — throttled to ≤1 req/s, frozen into the
 cache after one call; set `Nominatim__UserAgent` to identify your deployment per the public usage policy.
+`Nominatim__RegionalCountries` (CSV of ISO codes) names the extract's coverage: a bare one-word query needs a notable hit,
+with a lower bar inside it.
 
 ## Migrations
 

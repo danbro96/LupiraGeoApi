@@ -84,6 +84,41 @@ public sealed class GeocodingFallbackTests(GeocodingFixture fx) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Bare_word_passes_over_a_weak_regional_hit_to_a_notable_fallback_one()
+    {
+        var api = fx.Factory.ApiClient(Email);
+        (fx.Primary.ReturnResults, fx.Primary.WeakHit, fx.Fallback.CityHit) = (true, true, true);
+        try
+        {
+            var (p0, f0) = (fx.Primary.SearchCalls, fx.Fallback.SearchCalls);
+            var resolved = await ResolveAsync(api, "Riga");
+
+            Assert.Equal(PlaceResolution.Geocoded, resolved.Resolution);
+            Assert.Equal(56.9494, resolved.Latitude!.Value, 4);
+            Assert.Equal((p0 + 1, f0 + 1), (fx.Primary.SearchCalls, fx.Fallback.SearchCalls));
+        }
+        finally
+        {
+            (fx.Primary.ReturnResults, fx.Primary.WeakHit, fx.Fallback.CityHit) = (false, false, false);
+        }
+    }
+
+    [Fact]
+    public async Task Bare_word_with_no_notable_hit_stays_provisional()
+    {
+        var api = fx.Factory.ApiClient(Email);
+
+        var resolved = await ResolveAsync(api, "Shibuya"); // the fallback hit carries no importance
+
+        Assert.Equal(PlaceResolution.Provisional, resolved.Resolution);
+        Assert.Null(resolved.Latitude);
+    }
+
+    private static async Task<ResolvePlaceResponse> ResolveAsync(HttpClient api, string text) =>
+        (await (await api.PostAsJsonAsync("/places/resolve", new ResolvePlaceRequest { Text = text }))
+            .EnsureSuccessStatusCode().Content.ReadFromJsonAsync<ResolvePlaceResponse>())!;
+
+    [Fact]
     public async Task Reverse_falls_back_when_the_regional_instance_cannot_geocode()
     {
         var api = fx.Factory.ApiClient(Email);

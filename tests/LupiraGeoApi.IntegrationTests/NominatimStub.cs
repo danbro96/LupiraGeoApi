@@ -28,6 +28,9 @@ public sealed class NominatimStub : IAsyncDisposable
     /// <summary>When true, /search answers with a city boundary (what free text like "Riga, Latvia" matches).</summary>
     public bool CityHit { get; set; }
 
+    /// <summary>When true, /search answers with an obscure same-named hamlet (a regional answer to a foreign bare name).</summary>
+    public bool WeakHit { get; set; }
+
     private NominatimStub(WebApplication app) => _app = app;
 
     /// <summary>Start a stub. In <paramref name="failStatus"/> mode every request answers with that HTTP status (a
@@ -44,7 +47,8 @@ public sealed class NominatimStub : IAsyncDisposable
         {
             Interlocked.Increment(ref stub._searchCalls);
             return failStatus is { } s ? Results.StatusCode(s)
-                : Results.Content(!stub.ReturnResults ? "[]" : stub.CityHit ? CitySearchHit : stub.MultiHit ? MultiSearchHit : SearchHit, "application/json");
+                : Results.Content(!stub.ReturnResults ? "[]" : stub.WeakHit ? WeakSearchHit : stub.CityHit ? CitySearchHit
+                    : stub.MultiHit ? MultiSearchHit : SearchHit, "application/json");
         });
         app.MapGet("/reverse", () =>
         {
@@ -67,8 +71,14 @@ public sealed class NominatimStub : IAsyncDisposable
 
     private const string CitySearchHit = """
         [{"lat":"56.9493977","lon":"24.1051846","display_name":"Rīga, Latvija","name":"Rīga","addresstype":"city",
-          "category":"boundary","type":"administrative","place_rank":16,"osm_type":"relation","osm_id":13048688,
+          "category":"boundary","type":"administrative","place_rank":16,"importance":0.72,"osm_type":"relation","osm_id":13048688,
           "address":{"country_code":"lv","country":"Latvija","city":"Rīga"}}]
+        """;
+
+    private const string WeakSearchHit = """
+        [{"lat":"55.4664","lon":"10.0522","display_name":"Riga, Middelfart Kommune, Danmark","name":"Riga",
+          "addresstype":"hamlet","category":"place","type":"hamlet","place_rank":20,"importance":0.045,
+          "osm_type":"node","osm_id":3118057996,"address":{"country_code":"dk","country":"Danmark","postcode":"5463"}}]
         """;
 
     private const string SecondHit = """

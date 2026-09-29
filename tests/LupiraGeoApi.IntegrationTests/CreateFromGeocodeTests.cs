@@ -31,14 +31,14 @@ public sealed class CreateFromGeocodeTests(GeocodingFixture fx) : IAsyncLifetime
     {
         var api = fx.Factory.ApiClient(Email);
 
-        var hits = (await api.GetFromJsonAsync<List<GeocodeResultDto>>("/geocode/forward?q=Shibuya"))!;
+        var hits = (await api.GetFromJsonAsync<List<GeocodeResultDto>>("/geocode/forward?q=Shibuya%2C%20Tokyo"))!;
         Assert.Equal(2, hits.Count);
         Assert.Equal("way", hits[1].OsmType);
         Assert.Equal(654321, hits[1].OsmId);
         var (p0, f0) = (fx.Primary.SearchCalls, fx.Fallback.SearchCalls);
 
         var resp = await api.PostAsJsonAsync("/places/from-geocode",
-            new CreatePlaceFromGeocodeRequest { Query = "Shibuya", OsmType = "way", OsmId = 654321, Name = "Shibuya Station" });
+            new CreatePlaceFromGeocodeRequest { Query = "Shibuya, Tokyo", OsmType = "way", OsmId = 654321, Name = "Shibuya Station" });
         resp.EnsureSuccessStatusCode();
         var created = (await resp.Content.ReadFromJsonAsync<ResolvePlaceResponse>())!;
         Assert.Equal(PlaceResolution.Geocoded, created.Resolution);
@@ -54,7 +54,7 @@ public sealed class CreateFromGeocodeTests(GeocodingFixture fx) : IAsyncLifetime
 
         // Repeat pick of the same OSM object -> matched, same id, still no outbound calls.
         var again = (await (await api.PostAsJsonAsync("/places/from-geocode",
-            new CreatePlaceFromGeocodeRequest { Query = "Shibuya", OsmType = "way", OsmId = 654321 }))
+            new CreatePlaceFromGeocodeRequest { Query = "Shibuya, Tokyo", OsmType = "way", OsmId = 654321 }))
             .Content.ReadFromJsonAsync<ResolvePlaceResponse>())!;
         Assert.Equal(PlaceResolution.Matched, again.Resolution);
         Assert.Equal(created.PlaceId, again.PlaceId);
@@ -67,7 +67,7 @@ public sealed class CreateFromGeocodeTests(GeocodingFixture fx) : IAsyncLifetime
     {
         var api = fx.Factory.ApiClient(Email);
         var resp = await api.PostAsJsonAsync("/places/from-geocode",
-            new CreatePlaceFromGeocodeRequest { Query = "Shibuya", OsmType = "node", OsmId = 999999 });
+            new CreatePlaceFromGeocodeRequest { Query = "Shibuya, Tokyo", OsmType = "node", OsmId = 999999 });
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
     }
 }

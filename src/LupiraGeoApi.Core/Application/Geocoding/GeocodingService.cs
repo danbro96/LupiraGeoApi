@@ -10,8 +10,9 @@ namespace LupiraGeoApi.Core.Application.Geocoding;
 
 /// <summary>Forward + reverse geocoding, resolve-once-and-freeze into a <see cref="GeocodeCache"/> keyed by a
 /// deterministic id (quantized grid for reverse, normalized query for forward). Tries the self-hosted regional
-/// Nominatim first; when it is unset or yields nothing usable (an empty forward search, or a reverse hit no finer
-/// than a country — its worldwide country_osm_grid fallback), the public fallback (throttled via
+/// Nominatim first; when it is unset or yields nothing usable (a forward search with no hit passing
+/// <see cref="ForwardHitFilter"/>, or a reverse hit no finer than a country — its worldwide country_osm_grid
+/// fallback), the public fallback (throttled via
 /// <see cref="NominatimRateGate"/>) gets one shot — whichever answers is frozen, so a foreign query costs one
 /// external call ever. Both unset (or any failure) ⇒ cache-only / empty; it never blocks a resolve.</summary>
 public sealed class GeocodingService(
@@ -22,6 +23,9 @@ public sealed class GeocodingService(
     public const string FallbackClientName = "nominatim-fallback";
 
     private static readonly TimeSpan EmptyAnswerTtl = TimeSpan.FromDays(30);
+
+    // More than asked: the right hit can rank below a rejected one (Katrineholm's Valla is 4th for "640 23 Valla").
+    private const int CandidatePool = 10;
 
     private string? PrimaryUrl => Normalize(options.Value.BaseUrl);
 
@@ -98,18 +102,22 @@ public sealed class GeocodingService(
         query = query.Trim();
         if (query.Length == 0) return ForwardResult.Empty;
 
+        var regional = RegionalCountries();
+        List<GeocodeHit> Accepted(JsonElement root) =>
+            ParseArray(root).Where(h => ForwardHitFilter.Accepts(query, h, regional)).Take(limit).ToList();
+
         var id = GeocodeCache.ForwardId(query);
         if (!bypassCache && await session.LoadAsync<GeocodeCache>(id, ct) is { } cached)
         {
             using var cdoc = JsonDocument.Parse(cached.Payload);
-            var cachedHits = ParseArray(cdoc.RootElement);
+            var cachedHits = Accepted(cdoc.RootElement);
             // A frozen empty answer would otherwise make a provisional stub unhealable without force=true; OSM does
-            // get the missing address eventually. Hits stay frozen forever — those don't move.
+            // get the missing address eventually. Hits stay frozen forever — those don't move. All-rejected = empty.
             if (cachedHits.Count > 0 || DateTimeOffset.UtcNow - cached.ResolvedAt < EmptyAnswerTtl)
                 return ForwardResult.FromHits(cachedHits);
         }
 
-        var pathQuery = $"/search?format=jsonv2&addressdetails=1&limit={limit}&q={Uri.EscapeDataString(query)}";
+        var pathQuery = $"/search?format=jsonv2&addressdetails=1&limit={Math.Max(limit, CandidatePool)}&q={Uri.EscapeDataString(query)}";
         JsonDocument? emptyResult = null;
         var anyFailure = false;
         try
@@ -123,7 +131,7 @@ public sealed class GeocodingService(
                     continue;
                 } // transport failure after retries
 
-                var hits = ParseArray(fetch.RootElement);
+                var hits = Accepted(fetch.RootElement);
                 if (hits.Count > 0)
                 {
                     await CacheAsync(id, "forward", query, fetch.RootElement, ct);
@@ -132,7 +140,7 @@ public sealed class GeocodingService(
                 }
 
                 emptyResult?.Dispose();
-                emptyResult = fetch; // valid empty answer — freeze it only if no later endpoint does better
+                emptyResult = fetch; // empty or all-rejected — freeze it only if no later endpoint does better
             }
 
             // A definitive empty answer from any endpoint wins; only refuse (Unavailable) when nothing answered at
@@ -150,6 +158,11 @@ public sealed class GeocodingService(
             emptyResult?.Dispose();
         }
     }
+
+    private HashSet<string> RegionalCountries() =>
+        (options.Value.RegionalCountries ?? string.Empty)
+        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
     private IEnumerable<(string Client, string BaseUrl)> Endpoints()
     {
@@ -246,13 +259,14 @@ public sealed class GeocodingService(
         if (!TryDouble(el, "lat", out var lat) || !TryDouble(el, "lon", out var lon)) return null;
         var display = Str(el, "display_name") ?? Str(el, "name") ?? string.Empty;
 
-        string? cc = null, country = null, region = null, locality = null;
+        string? cc = null, country = null, region = null, locality = null, postcode = null;
         if (el.TryGetProperty("address", out var a) && a.ValueKind == JsonValueKind.Object)
         {
             cc = Str(a, "country_code")?.ToUpperInvariant();
             country = Str(a, "country");
             region = Str(a, "state") ?? Str(a, "region") ?? Str(a, "province");
             locality = Str(a, "city") ?? Str(a, "town") ?? Str(a, "village") ?? Str(a, "municipality");
+            postcode = Str(a, "postcode");
         }
 
         var type = Str(el, "type");
@@ -261,7 +275,8 @@ public sealed class GeocodingService(
         var osmType = Str(el, "osm_type");
         long? osmId = el.TryGetProperty("osm_id", out var o) && o.TryGetInt64(out var v) ? v : null;
         var isArea = AreaClassifier.IsArea(Str(el, "addresstype"), osmClass, type);
-        return new GeocodeHit(display, lat, lon, category, cc, country, region, locality, osmType, osmId, isArea);
+        double? importance = TryDouble(el, "importance", out var imp) ? imp : null;
+        return new GeocodeHit(display, lat, lon, category, cc, country, region, locality, osmType, osmId, isArea, postcode, importance);
     }
 
     /// <summary>Best-effort Nominatim OSM type/class → coarse <see cref="PlaceCategory"/>.</summary>

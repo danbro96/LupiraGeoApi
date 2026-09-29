@@ -7,4 +7,4 @@ namespace LupiraGeoApi.Core.Application.Geocoding;
 public sealed record GeocodeHit(
     string DisplayName, double Lat, double Lon, PlaceCategory Category,
     string? CountryCode, string? Country, string? Region, string? Locality,
-    string? OsmType, long? OsmId, bool IsArea = false);
+    string? OsmType, long? OsmId, bool IsArea = false, string? Postcode = null, double? Importance = null);
