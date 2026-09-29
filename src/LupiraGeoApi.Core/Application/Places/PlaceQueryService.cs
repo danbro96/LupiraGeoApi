@@ -20,6 +20,7 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
     public const int MaxResults = 200;
     public const int MaxSuggestions = 25;
     public const int MaxBatchResolve = 50;
+    public const int MaxBatchRegeocode = 50;
 
     /// <summary>word_similarity floor — below this a trigram match is noise, not a suggestion.</summary>
     private const double SuggestMinSimilarity = 0.3;
@@ -189,10 +190,19 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
     public async Task<OpResult<PlaceDto>> CreateAsync(CreatePlaceRequest r, Guid createdBy, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(r.Name)) return OpResult<PlaceDto>.Invalid("Name is required.");
+        var name = PlaceTextNormalizer.Canonical(r.Name);
+        var key = PlaceTextNormalizer.Key(name);
+
+        var clash = await db.Places.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.MergedIntoId == null && p.DeletedAt == null && p.NormalizedName == key, ct);
+        if (clash is not null)
+            return OpResult<PlaceDto>.Conflict($"\"{clash.CanonicalName}\" ({clash.Id}) already matches that name; update or alias it, or give this one a distinguishing name.");
+
         var place = new Place
         {
             Id = Guid.NewGuid(),
-            CanonicalName = r.Name.Trim(),
+            CanonicalName = name,
+            NormalizedName = key,
             Kind = r.Kind,
             Category = r.Category,
             Location = r is { Latitude: { } lat, Longitude: { } lon } ? new Point(lon, lat) { SRID = 4326 } : null,
@@ -219,10 +229,11 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
         if (r.Name is { } name)
         {
             if (string.IsNullOrWhiteSpace(name)) return OpResult<PlaceDto>.Invalid("Name cannot be blank.");
-            name = name.Trim();
+            name = PlaceTextNormalizer.Canonical(name);
             if (!string.Equals(place.CanonicalName, name, StringComparison.Ordinal))
             {
                 place.CanonicalName = name;
+                place.NormalizedName = PlaceTextNormalizer.Key(name);
                 db.Record(place.Id, CurationAction.Renamed, actorId, detail: name);
             }
         }
@@ -260,14 +271,60 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
     /// frozen geocode cache — the only way to heal a stub whose empty answer got frozen.</summary>
     public async Task<OpResult<PlaceDto>> RegeocodeAsync(Guid id, Guid actorId, bool force = false, CancellationToken ct = default)
     {
+        var (status, place, error) = await RegeocodeCoreAsync(id, actorId, force, ct);
+        switch (status)
+        {
+            case RegeocodeStatus.NotFound: return OpResult<PlaceDto>.NotFound();
+            case RegeocodeStatus.Conflict: return OpResult<PlaceDto>.Conflict(error!);
+            case RegeocodeStatus.Healed: break;
+            default: return OpResult<PlaceDto>.Invalid(error!);
+        }
+
+        var dto = place!.ToDto();
+        dto.Containment = await ContainmentAsync(place.WithinAreaId, ct);
+        return OpResult<PlaceDto>.Ok(dto);
+    }
+
+    /// <summary>Regeocode a worklist (max <see cref="MaxBatchRegeocode"/>) — the bulk healing path for
+    /// <c>hasCoordinates=false</c> stubs. Per-item outcomes; a no-hit or outage never aborts the rest.</summary>
+    public async Task<OpResult<List<RegeocodePlaceResultDto>>> RegeocodeBatchAsync(
+        List<Guid> placeIds, Guid actorId, bool force = false, CancellationToken ct = default)
+    {
+        if (placeIds is not { Count: > 0 }) return OpResult<List<RegeocodePlaceResultDto>>.Invalid("PlaceIds is required.");
+        if (placeIds.Count > MaxBatchRegeocode)
+            return OpResult<List<RegeocodePlaceResultDto>>.Invalid($"At most {MaxBatchRegeocode} places per batch.");
+
+        var results = new List<RegeocodePlaceResultDto>(placeIds.Count);
+        foreach (var id in placeIds.Distinct())
+        {
+            var (status, place, error) = await RegeocodeCoreAsync(id, actorId, force, ct);
+            results.Add(new RegeocodePlaceResultDto
+            {
+                PlaceId = id,
+                Status = status,
+                Name = place?.CanonicalName,
+                Latitude = place?.Location?.Y,
+                Longitude = place?.Location?.X,
+                Error = error,
+            });
+        }
+
+        return OpResult<List<RegeocodePlaceResultDto>>.Ok(results);
+    }
+
+    private async Task<(RegeocodeStatus Status, Place? Place, string? Error)> RegeocodeCoreAsync(
+        Guid id, Guid actorId, bool force, CancellationToken ct)
+    {
         var place = await db.Places.Include(p => p.ExternalIds)
             .FirstOrDefaultAsync(p => p.Id == id && p.MergedIntoId == null && p.DeletedAt == null, ct);
-        if (place is null) return OpResult<PlaceDto>.NotFound();
+        if (place is null) return (RegeocodeStatus.NotFound, null, "Not found.");
 
         var query = string.IsNullOrWhiteSpace(place.FormattedAddress) ? place.CanonicalName : place.FormattedAddress!;
         var result = await geocoder.ForwardAsync(query, limit: 1, bypassCache: force, ct: ct);
-        if (result.Status == GeocodeStatus.Unavailable) return OpResult<PlaceDto>.Invalid("Geocoder unavailable; retry.");
-        if (result.Hits.FirstOrDefault() is not { } hit) return OpResult<PlaceDto>.Invalid($"No geocode result for \"{query}\".");
+        if (result.Status == GeocodeStatus.Unavailable)
+            return (RegeocodeStatus.Unavailable, null, "Geocoder unavailable; retry.");
+        if (result.Hits.FirstOrDefault() is not { } hit)
+            return (RegeocodeStatus.NoHit, null, $"No geocode result for \"{query}\".");
 
         place.Location = new Point(hit.Lon, hit.Lat) { SRID = 4326 };
         place.FormattedAddress = hit.DisplayName;
@@ -298,12 +355,12 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
             // (Scheme, Value) index. Log it (the MCP layer would otherwise hide it) and fail cleanly.
             logger.LogError(ex, "Regeocoding place {PlaceId} failed to persist; OSM id {Osm} may already belong to another place.",
                 id, hit is { OsmType: { } ot, OsmId: { } oi } ? $"{ot}/{oi}" : "(none)");
-            return OpResult<PlaceDto>.Conflict("Could not persist the regeocode; its OSM id may already belong to another place.");
+            // The failed writes stay pending otherwise, and a batch would re-submit them on the next item's save.
+            db.ChangeTracker.Clear();
+            return (RegeocodeStatus.Conflict, null, "Could not persist the regeocode; its OSM id may already belong to another place.");
         }
 
-        var dto = place.ToDto();
-        dto.Containment = await ContainmentAsync(place.WithinAreaId, ct);
-        return OpResult<PlaceDto>.Ok(dto);
+        return (RegeocodeStatus.Healed, place, null);
     }
 
     /// <summary>Soft-delete a place: a bad entry (e.g. a wrong geocode) with no valid survivor to merge into. Tombstoned
@@ -323,14 +380,15 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
     public async Task<OpResult<PlaceDto>> AddAliasAsync(Guid placeId, AddAliasRequest r, Guid actorId, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(r.Name)) return OpResult<PlaceDto>.Invalid("Name is required.");
-        var name = r.Name.Trim();
+        var name = PlaceTextNormalizer.Canonical(r.Name);
+        var key = PlaceTextNormalizer.Key(name);
 
         var place = await db.Places.Include(p => p.Aliases).Include(p => p.ExternalIds)
             .FirstOrDefaultAsync(p => p.Id == placeId, ct);
         if (place is null) return OpResult<PlaceDto>.NotFound();
-        if (string.Equals(place.CanonicalName, name, StringComparison.OrdinalIgnoreCase))
+        if (place.NormalizedName == key)
             return OpResult<PlaceDto>.Conflict("Alias equals the canonical name.");
-        if (place.Aliases.Any(a => string.Equals(a.Name, name, StringComparison.OrdinalIgnoreCase)))
+        if (place.Aliases.Any(a => a.NormalizedName == key))
             return OpResult<PlaceDto>.Conflict("Alias already exists.");
 
         // Add via the set — a nav-discovered entity with a pre-set Guid key would be treated as an update.
@@ -340,6 +398,7 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
             Id = Guid.NewGuid(),
             PlaceId = place.Id,
             Name = name,
+            NormalizedName = key,
             Lang = string.IsNullOrWhiteSpace(r.Lang) ? null : r.Lang.Trim(),
         });
         db.Record(place.Id, CurationAction.AliasAdded, actorId, detail: name);
@@ -473,7 +532,7 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
         if (hit is null)
             return OpResult<ResolvePlaceResponse>.Invalid("That result is not among the geocode hits for this query.");
 
-        var name = string.Join(' ', (r.Name ?? r.Query).Trim().Split((char[]?) null, StringSplitOptions.RemoveEmptyEntries));
+        var name = PlaceTextNormalizer.Canonical(r.Name ?? r.Query);
         ResolveOutcome outcome;
         try
         {

@@ -26,6 +26,8 @@ public static class GeoServiceCollectionExtensions
         services.AddScoped<PlaceResolver>();
         services.AddScoped<PlaceQueryService>();
         services.AddScoped<PlaceMergeService>();
+        services.AddScoped<PlaceNameBackfill>();
+        services.AddScoped<PlaceDuplicateService>();
         services.AddScoped<SavedPlaceService>();
         services.AddScoped<AdminAreaService>();
         services.AddScoped<GazetteerImporter>();

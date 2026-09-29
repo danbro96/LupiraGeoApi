@@ -7,8 +7,12 @@ using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace LupiraGeoApi.Handlers;
 
-public sealed class PlacesHandler(PlaceQueryService places, PlaceMergeService merges, CurrentUser user)
+public sealed class PlacesHandler(PlaceQueryService places, PlaceMergeService merges, PlaceDuplicateService duplicates, CurrentUser user)
 {
+    public async Task<Results<Ok<List<DuplicateClusterDto>>, ProblemHttpResult, UnauthorizedHttpResult>> DuplicatesAsync(
+        double? radiusM, double? minSimilarity, int? limit, CancellationToken ct) =>
+        OpResultMap.OkProblem(await duplicates.FindAsync(radiusM, minSimilarity, limit, ct));
+
     public async Task<Results<Ok<List<PlaceDto>>, ProblemHttpResult, UnauthorizedHttpResult>> SearchAsync(
         string? q, PlaceCategory? category, PlaceKind? kind, Guid? withinAreaId,
         bool? hasCoordinates, PlaceSource? source, bool? verified,
@@ -81,6 +85,13 @@ public sealed class PlacesHandler(PlaceQueryService places, PlaceMergeService me
     {
         var u = await user.GetAsync(ct);
         return OpResultMap.OkNotFoundProblem(await places.RegeocodeAsync(id, u.Id, force, ct));
+    }
+
+    public async Task<Results<Ok<List<RegeocodePlaceResultDto>>, ProblemHttpResult, UnauthorizedHttpResult>> RegeocodeBatchAsync(
+        RegeocodePlacesBatchRequest r, CancellationToken ct)
+    {
+        var u = await user.GetAsync(ct);
+        return OpResultMap.OkProblem(await places.RegeocodeBatchAsync(r.PlaceIds, u.Id, r.Force, ct));
     }
 
     public async Task<Results<NoContent, NotFound, ProblemHttpResult, UnauthorizedHttpResult>> DeleteAsync(Guid id, CancellationToken ct)

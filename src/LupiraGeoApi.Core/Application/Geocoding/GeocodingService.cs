@@ -21,6 +21,8 @@ public sealed class GeocodingService(
     public const string PrimaryClientName = "nominatim";
     public const string FallbackClientName = "nominatim-fallback";
 
+    private static readonly TimeSpan EmptyAnswerTtl = TimeSpan.FromDays(30);
+
     private string? PrimaryUrl => Normalize(options.Value.BaseUrl);
 
     private string? FallbackUrl => Normalize(options.Value.FallbackBaseUrl);
@@ -100,7 +102,11 @@ public sealed class GeocodingService(
         if (!bypassCache && await session.LoadAsync<GeocodeCache>(id, ct) is { } cached)
         {
             using var cdoc = JsonDocument.Parse(cached.Payload);
-            return ForwardResult.FromHits(ParseArray(cdoc.RootElement));
+            var cachedHits = ParseArray(cdoc.RootElement);
+            // A frozen empty answer would otherwise make a provisional stub unhealable without force=true; OSM does
+            // get the missing address eventually. Hits stay frozen forever — those don't move.
+            if (cachedHits.Count > 0 || DateTimeOffset.UtcNow - cached.ResolvedAt < EmptyAnswerTtl)
+                return ForwardResult.FromHits(cachedHits);
         }
 
         var pathQuery = $"/search?format=jsonv2&addressdetails=1&limit={limit}&q={Uri.EscapeDataString(query)}";

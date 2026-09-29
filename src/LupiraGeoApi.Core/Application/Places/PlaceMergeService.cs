@@ -91,9 +91,10 @@ public sealed class PlaceMergeService(GeoDbContext db, Marten.IDocumentSession s
 
     private void AddWinnerAlias(Place winner, string name, string? lang)
     {
-        if (string.Equals(winner.CanonicalName, name, StringComparison.OrdinalIgnoreCase)) return;
-        if (winner.Aliases.Any(a => string.Equals(a.Name, name, StringComparison.OrdinalIgnoreCase))) return;
-        var alias = new PlaceAlias { Id = Guid.NewGuid(), PlaceId = winner.Id, Name = name, Lang = lang };
+        var key = PlaceTextNormalizer.Key(name);
+        if (winner.NormalizedName == key) return;
+        if (winner.Aliases.Any(a => a.NormalizedName == key)) return;
+        var alias = new PlaceAlias { Id = Guid.NewGuid(), PlaceId = winner.Id, Name = name, NormalizedName = key, Lang = lang };
         winner.Aliases.Add(alias);
         db.PlaceAliases.Add(alias);
     }

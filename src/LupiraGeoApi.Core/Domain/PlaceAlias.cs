@@ -9,5 +9,8 @@ public sealed class PlaceAlias
 
     public string Name { get; set; } = string.Empty;
 
+    /// <summary>Folded <see cref="Name"/> (<c>PlaceTextNormalizer.Key</c>) — the resolve match key.</summary>
+    public string NormalizedName { get; set; } = string.Empty;
+
     public string? Lang { get; set; }
 }

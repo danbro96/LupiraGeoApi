@@ -8,7 +8,7 @@ namespace LupiraGeoApi.Core.Application.Places;
 
 /// <summary>
 /// Resolves a free-text location to a gazetteer <see cref="Place"/> — the write path that replaces LupiraCalApi's
-/// global exact-string dedup. Strategy: (1) match an existing place by case-insensitive name or alias; (2) else forward-geocode
+/// global exact-string dedup. Strategy: (1) match an existing place by normalized name or alias; (2) else forward-geocode
 /// and, if coordinates come back, dedupe by name+proximity or create a <see cref="PlaceSource.Geocoded"/> place with
 /// coordinates and an on-demand <see cref="AdminArea"/> containment chain; (3) on a definitive empty result provisionally
 /// create an unverified <see cref="PlaceSource.User"/> place with no coordinates. A transient geocoder outage
@@ -20,14 +20,23 @@ public sealed class PlaceResolver(GeoDbContext db, GeocodingService geocoder, Ad
 {
     private const double DedupeMeters = 60;
 
+    /// <summary>word_similarity floor for the proximity dedup — within 60 m, this much name overlap is the same thing.</summary>
+    private const double DedupeSimilarity = 0.7;
+
     public async Task<ResolveOutcome> ResolveAsync(string text, Guid? createdBy = null, CancellationToken ct = default)
     {
-        var name = string.Join(' ', text.Trim().Split((char[]?) null, StringSplitOptions.RemoveEmptyEntries));
+        var name = PlaceTextNormalizer.Canonical(text);
+        var key = PlaceTextNormalizer.Key(name);
 
-        // (1) Existing place by case-insensitive name or alias.
-        var existing = await db.Places.FirstOrDefaultAsync(
-            p => p.MergedIntoId == null && p.DeletedAt == null &&
-            (EF.Functions.ILike(p.CanonicalName, name) || p.Aliases.Any(a => EF.Functions.ILike(a.Name, name))), ct);
+        // (1) Existing place by normalized name or alias. Ordered so a healed place beats a stub that folds the same
+        // way — otherwise which duplicate wins depends on Postgres' row order.
+        var existing = await db.Places
+            .Where(p => p.MergedIntoId == null && p.DeletedAt == null
+                && (p.NormalizedName == key || p.Aliases.Any(a => a.NormalizedName == key)))
+            .OrderByDescending(p => p.Location != null)
+            .ThenByDescending(p => p.Verified)
+            .ThenBy(p => p.CreatedAt)
+            .FirstOrDefaultAsync(ct);
         if (existing is not null) return new ResolveOutcome(existing, PlaceResolution.Matched);
 
         // (2) Forward-geocode. A transient outage stops here — do not create anything.
@@ -42,6 +51,7 @@ public sealed class PlaceResolver(GeoDbContext db, GeocodingService geocoder, Ad
         {
             Id = Guid.NewGuid(),
             CanonicalName = name,
+            NormalizedName = key,
             Kind = PlaceKind.Poi,
             Category = PlaceCategory.Unknown,
             Source = PlaceSource.User,
@@ -61,6 +71,7 @@ public sealed class PlaceResolver(GeoDbContext db, GeocodingService geocoder, Ad
     internal async Task<ResolveOutcome> ResolveFromHitAsync(string name, GeocodeHit hit, Guid? createdBy, CancellationToken ct)
     {
         var point = new Point(hit.Lon, hit.Lat) { SRID = 4326 };
+        var key = PlaceTextNormalizer.Key(name);
         var osmId = hit is { OsmType: { } t, OsmId: { } oid } ? $"{t}/{oid}" : null;
 
         // Dedup by OSM identity first: one real-world object resolves here under many text forms (a bare name
@@ -74,9 +85,14 @@ public sealed class PlaceResolver(GeoDbContext db, GeocodingService geocoder, Ad
             if (byOsm is not null) return new ResolveOutcome(byOsm, PlaceResolution.Matched);
         }
 
+        // Similarity, not equality: "Bara enkelt" and "Bara enkelt, Skånegatan 59" are one venue. word_similarity is
+        // asymmetric (it scores the best extent of the second argument), so try both directions.
         var near = await db.Places
             .Where(p => p.MergedIntoId == null && p.DeletedAt == null && p.Location != null
-                && p.Location.Distance(point) <= DedupeMeters && EF.Functions.ILike(p.CanonicalName, name))
+                && p.Location.Distance(point) <= DedupeMeters
+                && (p.NormalizedName == key
+                    || EF.Functions.TrigramsWordSimilarity(key, p.NormalizedName) >= DedupeSimilarity
+                    || EF.Functions.TrigramsWordSimilarity(p.NormalizedName, key) >= DedupeSimilarity))
             .FirstOrDefaultAsync(ct);
         if (near is not null) return new ResolveOutcome(near, PlaceResolution.Matched);
 
@@ -85,6 +101,7 @@ public sealed class PlaceResolver(GeoDbContext db, GeocodingService geocoder, Ad
         {
             Id = Guid.NewGuid(),
             CanonicalName = name,
+            NormalizedName = key,
             Kind = PlaceKind.Poi,
             Category = hit.Category,
             Location = point,

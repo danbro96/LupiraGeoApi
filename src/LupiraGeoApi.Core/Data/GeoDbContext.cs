@@ -35,6 +35,7 @@ public sealed class GeoDbContext(DbContextOptions<GeoDbContext> options) : DbCon
         {
             e.HasKey(p => p.Id);
             e.Property(p => p.CanonicalName).IsRequired();
+            e.Property(p => p.NormalizedName).IsRequired();
             e.Property(p => p.Kind).HasConversion<string>().IsRequired();
             e.Property(p => p.Category).HasConversion<string>().IsRequired();
             e.Property(p => p.Source).HasConversion<string>().IsRequired();
@@ -42,6 +43,8 @@ public sealed class GeoDbContext(DbContextOptions<GeoDbContext> options) : DbCon
 
             e.HasIndex(p => p.Location).HasMethod("gist");
             e.HasIndex(p => p.CanonicalName).HasMethod("gin").HasOperators("gin_trgm_ops");
+            // Not unique: pre-normalization duplicates exist, and merging — not a constraint violation — resolves them.
+            e.HasIndex(p => p.NormalizedName);
             e.HasIndex(p => p.WithinAreaId);
             e.HasIndex(p => p.Category);
 
@@ -60,7 +63,9 @@ public sealed class GeoDbContext(DbContextOptions<GeoDbContext> options) : DbCon
         {
             e.HasKey(a => a.Id);
             e.Property(a => a.Name).IsRequired();
+            e.Property(a => a.NormalizedName).IsRequired();
             e.HasIndex(a => a.Name).HasMethod("gin").HasOperators("gin_trgm_ops");
+            e.HasIndex(a => a.NormalizedName);
             e.HasIndex(a => a.PlaceId);
         });
 

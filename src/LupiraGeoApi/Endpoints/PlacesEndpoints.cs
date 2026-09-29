@@ -24,6 +24,12 @@ public static class PlacesEndpoints
             .WithSummary("Typeahead: trigram-ranked suggestions over places (names + aliases) and AdminArea localities, discriminated by type.")
             .Produces<List<PlaceSuggestionDto>>(StatusCodes.Status200OK).ProducesProblem(StatusCodes.Status400BadRequest);
 
+        group.MapGet("/duplicates", (double? radiusM, double? minSimilarity, int? limit, PlacesHandler h, CancellationToken ct) =>
+                h.DuplicatesAsync(radiusM, minSimilarity, limit, ct))
+            .WithName("FindDuplicatePlaces")
+            .WithSummary("Duplicate candidates for the curation pass: places sharing a match key (SameName), plus co-located places with similar names (CoLocated, radiusM default 25, minSimilarity default 0.3). Read-only — merging is the caller's call.")
+            .Produces<List<DuplicateClusterDto>>(StatusCodes.Status200OK).ProducesProblem(StatusCodes.Status400BadRequest);
+
         group.MapGet("/by-external/{scheme}/{**value}", (ExternalScheme scheme, string value, PlacesHandler h, CancellationToken ct) =>
                 h.GetByExternalIdAsync(scheme, value, ct))
             .WithName("GetPlaceByExternalId")
@@ -79,6 +85,11 @@ public static class PlacesEndpoints
             .WithName("RegeocodePlace")
             .WithSummary("Re-geocode a place from its address/name and attach coordinates, containment, and OSM id — heals a coordinate-less stub or refreshes a stale fix. force=true bypasses and overwrites the frozen geocode cache (heals a frozen empty answer). 400 on a no-hit or transient geocoder outage; the place is left unchanged.")
             .Produces<PlaceDto>(StatusCodes.Status200OK).ProducesProblem(StatusCodes.Status404NotFound).ProducesProblem(StatusCodes.Status400BadRequest);
+
+        group.MapPost("/regeocode:batch", (RegeocodePlacesBatchRequest r, PlacesHandler h, CancellationToken ct) => h.RegeocodeBatchAsync(r, ct))
+            .WithName("RegeocodePlacesBatch")
+            .WithSummary("Regeocode up to 50 places in one call — the bulk healing path for unlocated stubs. Per-item status (Healed/NoHit/Unavailable/Conflict/NotFound); a failure never aborts the rest. force=true bypasses the frozen geocode cache.")
+            .Produces<List<RegeocodePlaceResultDto>>(StatusCodes.Status200OK).ProducesProblem(StatusCodes.Status400BadRequest);
 
         group.MapDelete("/{id:guid}", (Guid id, PlacesHandler h, CancellationToken ct) => h.DeleteAsync(id, ct))
             .WithName("DeletePlace")

@@ -393,6 +393,91 @@
         ]
       }
     },
+    "/places/duplicates": {
+      "get": {
+        "tags": [
+          "Places"
+        ],
+        "summary": "Duplicate candidates for the curation pass: places sharing a match key (SameName), plus co-located places with similar names (CoLocated, radiusM default 25, minSimilarity default 0.3). Read-only — merging is the caller's call.",
+        "operationId": "FindDuplicatePlaces",
+        "parameters": [
+          {
+            "name": "radiusM",
+            "in": "query",
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          {
+            "name": "minSimilarity",
+            "in": "query",
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DuplicateClusterDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
     "/places/by-external/{scheme}/{value}": {
       "get": {
         "tags": [
@@ -1245,6 +1330,75 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/places/regeocode:batch": {
+      "post": {
+        "tags": [
+          "Places"
+        ],
+        "summary": "Regeocode up to 50 places in one call — the bulk healing path for unlocated stubs. Per-item status (Healed/NoHit/Unavailable/Conflict/NotFound); a failure never aborts the rest. force=true bypasses the frozen geocode cache.",
+        "operationId": "RegeocodePlacesBatch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegeocodePlacesBatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RegeocodePlaceResultDto"
+                  }
                 }
               }
             }
@@ -2516,6 +2670,38 @@
         },
         "description": "One curation-log entry for a place. Readable for tombstoned/merged places too — that is the audit's point."
       },
+      "DuplicateClusterDto": {
+        "required": [
+          "reason",
+          "places"
+        ],
+        "type": "object",
+        "properties": {
+          "reason": {
+            "$ref": "#/components/schemas/DuplicateReason"
+          },
+          "spreadM": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Greatest separation within the cluster; null when the cluster has no coordinates to compare.",
+            "format": "double"
+          },
+          "places": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlaceDto"
+            }
+          }
+        }
+      },
+      "DuplicateReason": {
+        "enum": [
+          "SameName",
+          "CoLocated"
+        ]
+      },
       "ExternalScheme": {
         "enum": [
           "Osm",
@@ -3067,6 +3253,75 @@
           "NotFound"
         ],
         "description": "Per-place outcome of an orphan prune: soft-deleted (or already was), skipped because something still\n            references it, or the id is unknown/merged."
+      },
+      "RegeocodePlaceResultDto": {
+        "required": [
+          "placeId",
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "placeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RegeocodeStatus"
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "latitude": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "longitude": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "RegeocodePlacesBatchRequest": {
+        "required": [
+          "placeIds"
+        ],
+        "type": "object",
+        "properties": {
+          "placeIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "force": {
+            "type": "boolean"
+          }
+        }
+      },
+      "RegeocodeStatus": {
+        "enum": [
+          "Healed",
+          "NoHit",
+          "Unavailable",
+          "Conflict",
+          "NotFound"
+        ]
       },
       "ResolvePlaceRequest": {
         "required": [

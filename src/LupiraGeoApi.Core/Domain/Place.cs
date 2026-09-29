@@ -15,6 +15,9 @@ public sealed class Place
 
     public string CanonicalName { get; set; } = string.Empty;
 
+    /// <summary>Folded <see cref="CanonicalName"/> (<c>PlaceTextNormalizer.Key</c>) — the resolve match key.</summary>
+    public string NormalizedName { get; set; } = string.Empty;
+
     public PlaceKind Kind { get; set; }
 
     public PlaceCategory Category { get; set; }

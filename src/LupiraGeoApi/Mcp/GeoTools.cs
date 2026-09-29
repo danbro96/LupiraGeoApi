@@ -18,7 +18,7 @@ namespace LupiraGeoApi.Mcp;
 /// search/lookup/reverse-geocode; writes cover the import + curation path (forward-geocode, resolve, create, save,
 /// alias, curate). LAN/WireGuard-only (see <see cref="LupiraGeoApi.Endpoints.LanOnlyExposure"/>), so no public write surface.</summary>
 [McpServerToolType]
-public sealed class GeoTools(CurrentUser user, PlaceQueryService places, GeocodingService geocoder, PlaceMergeService merges, SavedPlaceService saved, PlaceOrphanService orphans)
+public sealed class GeoTools(CurrentUser user, PlaceQueryService places, GeocodingService geocoder, PlaceMergeService merges, SavedPlaceService saved, PlaceOrphanService orphans, PlaceDuplicateService duplicates)
 {
     [McpServerTool(Name = "search_places")]
     [Description("Search the gazetteer by text and/or proximity; returns matching places with coordinates.")]
@@ -145,6 +145,15 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         CancellationToken ct = default) =>
         Require(await places.SearchAsync(null, null, null, null, false, source, verified, null, null, null, null, limit, ct));
 
+    [McpServerTool(Name = "list_duplicate_candidates")]
+    [Description("Duplicate candidates for a curation pass: places sharing a match key (reason=SameName), plus co-located places with similar names (reason=CoLocated). Read-only — review each cluster and merge_places the losers into the best survivor (the one with coordinates). Loosen with radiusM/minSimilarity to catch pairs whose labels differ more.")]
+    public async Task<List<DuplicateClusterDto>> ListDuplicateCandidates(
+        [Description("Co-location radius in metres (default 25, max 500).")] double? radiusM = null,
+        [Description("Trigram name-similarity floor for co-located pairs, 0-1 (default 0.3).")] double? minSimilarity = null,
+        [Description("Max clusters (default 50).")] int? limit = null,
+        CancellationToken ct = default) =>
+        Require(await duplicates.FindAsync(radiusM, minSimilarity, limit, ct));
+
     [McpServerTool(Name = "list_orphans")]
     [Description("Live places nothing references — cross-checked against contact addresses, calendar items (live + soft-deleted counted separately), and saved places. Prunable=false means only soft-deleted calendar items still reference it. Fails when a reference source is unreachable rather than declaring orphans on partial data.")]
     public async Task<List<OrphanCandidateDto>> ListOrphans(CancellationToken ct = default) =>
@@ -173,6 +182,17 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
     {
         var u = await user.GetAsync(ct);
         return Require(await places.RegeocodeAsync(id, u.Id, force, ct));
+    }
+
+    [McpServerTool(Name = "regeocode_places")]
+    [Description("Regeocode up to 50 places in one call — the bulk healing path for the list_unlocated worklist. Each item comes back with a status (Healed/NoHit/Unavailable/Conflict/NotFound); a per-item failure never aborts the rest. Unavailable means the geocoder was unreachable — re-run just those ids.")]
+    public async Task<List<RegeocodePlaceResultDto>> RegeocodePlaces(
+        [Description("Place ids to regeocode (max 50).")] List<Guid> placeIds,
+        [Description("Bypass and overwrite the frozen geocode cache for each query — use when earlier empty answers were frozen.")] bool force = false,
+        CancellationToken ct = default)
+    {
+        var u = await user.GetAsync(ct);
+        return Require(await places.RegeocodeBatchAsync(placeIds, u.Id, force, ct));
     }
 
     [McpServerTool(Name = "merge_places")]

@@ -7,6 +7,7 @@ using LupiraGeoApi.Clients;
 using LupiraGeoApi.Core.Abstractions;
 using LupiraGeoApi.Core.Application.Gazetteer;
 using LupiraGeoApi.Core.Application.Geocoding;
+using LupiraGeoApi.Core.Application.Places;
 using LupiraGeoApi.Core.Data;
 using LupiraGeoApi.Dependencies;
 using LupiraGeoApi.Endpoints;
@@ -262,7 +263,8 @@ if (args.Contains("--apply-schema"))
     await store.Storage.ApplyAllConfiguredChangesToDatabaseAsync();
     var db = scope.ServiceProvider.GetRequiredService<GeoDbContext>();
     await db.Database.MigrateAsync();
-    Console.WriteLine("Schema applied (Marten + EF).");
+    var (places, aliases) = await scope.ServiceProvider.GetRequiredService<PlaceNameBackfill>().RunAsync();
+    Console.WriteLine($"Schema applied (Marten + EF). Match keys rebuilt: {places} places, {aliases} aliases.");
     return;
 }
 
@@ -283,6 +285,7 @@ if (app.Environment.IsDevelopment())
     await using var scope = app.Services.CreateAsyncScope();
     var db = scope.ServiceProvider.GetRequiredService<GeoDbContext>();
     await db.Database.MigrateAsync();
+    await scope.ServiceProvider.GetRequiredService<PlaceNameBackfill>().RunAsync();
 }
 
 // LAN-only surfaces (/mcp + its discovery metadata): 404 anything arriving through the tunnel,
