@@ -102,7 +102,7 @@ public sealed class PlaceResolver(GeoDbContext db, GeocodingService geocoder, Ad
             Id = Guid.NewGuid(),
             CanonicalName = name,
             NormalizedName = key,
-            Kind = PlaceKind.Poi,
+            Kind = hit.IsArea ? PlaceKind.Area : PlaceKind.Poi,
             Category = hit.Category,
             Location = point,
             FormattedAddress = hit.DisplayName,

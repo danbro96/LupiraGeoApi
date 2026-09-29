@@ -6,8 +6,14 @@ using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace LupiraGeoApi.Handlers;
 
-public sealed class CurationHandler(PlaceOrphanService orphans, CurrentUser user)
+public sealed class CurationHandler(PlaceOrphanService orphans, PlaceAreaSweepService areas, CurrentUser user)
 {
+    public async Task<Results<Ok<List<AreaReclassificationDto>>, ProblemHttpResult, UnauthorizedHttpResult>> ClassifyAreasAsync(bool apply, CancellationToken ct)
+    {
+        var u = await user.GetAsync(ct);
+        return OpResultMap.OkProblem(await areas.SweepAsync(apply, u.Id, ct));
+    }
+
     public async Task<Results<Ok<List<OrphanCandidateDto>>, ProblemHttpResult, UnauthorizedHttpResult>> FindOrphansAsync(CancellationToken ct) =>
         OpResultMap.OkProblem(await orphans.FindOrphansAsync(ct));
 

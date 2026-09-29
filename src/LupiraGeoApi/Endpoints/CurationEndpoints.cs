@@ -21,6 +21,11 @@ public static class CurationEndpoints
             .WithSummary("Soft-delete orphan places (max 100 per call). References are re-checked per id at prune time; a place referenced since the find returns Referenced and is left alone. Places referenced only by soft-deleted calendar items are never pruned here — use DELETE /places/{id} to override.")
             .Produces<List<PrunePlaceResultDto>>(StatusCodes.Status200OK).ProducesProblem(StatusCodes.Status400BadRequest);
 
+        group.MapPost("/classify-areas", (CurationHandler h, CancellationToken ct, bool apply = false) => h.ClassifyAreasAsync(apply, ct))
+            .WithName("ClassifyAreaPlaces")
+            .WithSummary("Reclassify uncategorized geocoded places whose cached geocode matched a settlement or administrative area (city, municipality, region, country) from Poi to Area. Dry run unless apply=true; reads the geocode cache only.")
+            .Produces<List<AreaReclassificationDto>>(StatusCodes.Status200OK).ProducesProblem(StatusCodes.Status400BadRequest);
+
         return app;
     }
 }

@@ -25,6 +25,9 @@ public sealed class NominatimStub : IAsyncDisposable
     /// <summary>When true, /search answers with two hits instead of one (pick-a-hit scenarios).</summary>
     public bool MultiHit { get; set; }
 
+    /// <summary>When true, /search answers with a city boundary (what free text like "Riga, Latvia" matches).</summary>
+    public bool CityHit { get; set; }
+
     private NominatimStub(WebApplication app) => _app = app;
 
     /// <summary>Start a stub. In <paramref name="failStatus"/> mode every request answers with that HTTP status (a
@@ -41,7 +44,7 @@ public sealed class NominatimStub : IAsyncDisposable
         {
             Interlocked.Increment(ref stub._searchCalls);
             return failStatus is { } s ? Results.StatusCode(s)
-                : Results.Content(stub.ReturnResults ? (stub.MultiHit ? MultiSearchHit : SearchHit) : "[]", "application/json");
+                : Results.Content(!stub.ReturnResults ? "[]" : stub.CityHit ? CitySearchHit : stub.MultiHit ? MultiSearchHit : SearchHit, "application/json");
         });
         app.MapGet("/reverse", () =>
         {
@@ -59,6 +62,14 @@ public sealed class NominatimStub : IAsyncDisposable
     private const string SearchHit = $"[{ReverseHit}]";
 
     private const string MultiSearchHit = $"[{ReverseHit},{SecondHit}]";
+
+    public const long CityOsmId = 13048688;
+
+    private const string CitySearchHit = """
+        [{"lat":"56.9493977","lon":"24.1051846","display_name":"Rīga, Latvija","name":"Rīga","addresstype":"city",
+          "category":"boundary","type":"administrative","place_rank":16,"osm_type":"relation","osm_id":13048688,
+          "address":{"country_code":"lv","country":"Latvija","city":"Rīga"}}]
+        """;
 
     private const string SecondHit = """
         {"lat":"35.6684","lon":"139.6833","display_name":"Shibuya Station, Shibuya, Tokyo, Japan",

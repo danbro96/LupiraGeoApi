@@ -18,7 +18,7 @@ namespace LupiraGeoApi.Mcp;
 /// search/lookup/reverse-geocode; writes cover the import + curation path (forward-geocode, resolve, create, save,
 /// alias, curate). LAN/WireGuard-only (see <see cref="LupiraGeoApi.Endpoints.LanOnlyExposure"/>), so no public write surface.</summary>
 [McpServerToolType]
-public sealed class GeoTools(CurrentUser user, PlaceQueryService places, GeocodingService geocoder, PlaceMergeService merges, SavedPlaceService saved, PlaceOrphanService orphans, PlaceDuplicateService duplicates)
+public sealed class GeoTools(CurrentUser user, PlaceQueryService places, GeocodingService geocoder, PlaceMergeService merges, SavedPlaceService saved, PlaceOrphanService orphans, PlaceDuplicateService duplicates, PlaceAreaSweepService areas)
 {
     [McpServerTool(Name = "search_places")]
     [Description("Search the gazetteer by text and/or proximity; returns matching places with coordinates.")]
@@ -88,7 +88,7 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
     [Description("Create a gazetteer place directly with a known name/category and optional coordinates. Prefer when you already know the semantics (e.g. a school); use resolve_place when you only have free text.")]
     public async Task<PlaceDto> CreatePlace(
         [Description("Canonical place name.")] string name,
-        [Description("Poi (a named venue) or Address.")] PlaceKind kind = PlaceKind.Poi,
+        [Description("Poi (a named venue), Address, or Area (a whole city/municipality/region/country).")] PlaceKind kind = PlaceKind.Poi,
         [Description("Semantic category (Home/Office/School/…).")] PlaceCategory category = PlaceCategory.Unknown,
         [Description("Latitude (optional; omit for a coordinate-less provisional place).")] double? latitude = null,
         [Description("Longitude (optional).")] double? longitude = null,
@@ -111,11 +111,12 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
     }
 
     [McpServerTool(Name = "update_place")]
-    [Description("Curate a place: rename, recategorize, verify, or correct its location by hand. Omitted fields are left unchanged. latitude+longitude (both together) move the point — use to fix a wrong geocode; pass withinAreaId to re-anchor its containment to match. To auto-heal a coordinate-less place from its address, prefer regeocode_place.")]
+    [Description("Curate a place: rename, recategorize, reclassify its kind, verify, or correct its location by hand. Omitted fields are left unchanged. latitude+longitude (both together) move the point — use to fix a wrong geocode; pass withinAreaId to re-anchor its containment to match. To auto-heal a coordinate-less place from its address, prefer regeocode_place.")]
     public async Task<PlaceDto> UpdatePlace(
         [Description("Place id.")] Guid id,
         [Description("New canonical name (optional).")] string? name = null,
         [Description("New category (optional).")] PlaceCategory? category = null,
+        [Description("New kind (optional): Poi, Address, or Area for a whole city/municipality/region/country.")] PlaceKind? kind = null,
         [Description("Verified flag (optional).")] bool? verified = null,
         [Description("Corrected latitude (optional; must accompany longitude).")] double? latitude = null,
         [Description("Corrected longitude (optional; must accompany latitude).")] double? longitude = null,
@@ -128,6 +129,7 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         {
             Name = name,
             Category = category,
+            Kind = kind,
             Verified = verified,
             Latitude = latitude,
             Longitude = longitude,
@@ -166,6 +168,15 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
     {
         var u = await user.GetAsync(ct);
         return Require(await orphans.PruneAsync(placeIds, u.Id, ct));
+    }
+
+    [McpServerTool(Name = "classify_area_places")]
+    [Description("Find uncategorized geocoded places whose cached geocode matched a whole settlement or administrative area (city, municipality, region, country) and reclassify them from Poi to Area. Dry run by default — review the list, then call again with apply=true. Reads the geocode cache only (no geocoder calls).")]
+    public async Task<List<AreaReclassificationDto>> ClassifyAreaPlaces(
+        [Description("Apply the reclassification (default false: report only).")] bool apply = false, CancellationToken ct = default)
+    {
+        var u = await user.GetAsync(ct);
+        return Require(await areas.SweepAsync(apply, u.Id, ct));
     }
 
     [McpServerTool(Name = "get_place_history")]

@@ -215,6 +215,22 @@ public sealed class GeocodingService(
         await session.SaveChangesAsync(ct);
     }
 
+    /// <summary>Re-parse a frozen <see cref="GeocodeCache.Payload"/>: a forward array or a single reverse object.
+    /// A malformed payload yields no hits.</summary>
+    public static IReadOnlyList<GeocodeHit> ParseCached(string payload)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(payload);
+            var root = doc.RootElement;
+            return root.ValueKind == JsonValueKind.Array ? ParseArray(root) : ParseHit(root) is { } hit ? [hit] : [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
     private static IReadOnlyList<GeocodeHit> ParseArray(JsonElement root)
     {
         if (root.ValueKind != JsonValueKind.Array) return [];
@@ -239,10 +255,13 @@ public sealed class GeocodingService(
             locality = Str(a, "city") ?? Str(a, "town") ?? Str(a, "village") ?? Str(a, "municipality");
         }
 
-        var category = MapCategory(Str(el, "type"), Str(el, "category") ?? Str(el, "class"));
+        var type = Str(el, "type");
+        var osmClass = Str(el, "category") ?? Str(el, "class");
+        var category = MapCategory(type, osmClass);
         var osmType = Str(el, "osm_type");
         long? osmId = el.TryGetProperty("osm_id", out var o) && o.TryGetInt64(out var v) ? v : null;
-        return new GeocodeHit(display, lat, lon, category, cc, country, region, locality, osmType, osmId);
+        var isArea = AreaClassifier.IsArea(Str(el, "addresstype"), osmClass, type);
+        return new GeocodeHit(display, lat, lon, category, cc, country, region, locality, osmType, osmId, isArea);
     }
 
     /// <summary>Best-effort Nominatim OSM type/class → coarse <see cref="PlaceCategory"/>.</summary>

@@ -244,6 +244,12 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
             db.Record(place.Id, CurationAction.Recategorized, actorId, detail: cat.ToString());
         }
 
+        if (r.Kind is { } kind && kind != place.Kind)
+        {
+            place.Kind = kind;
+            db.Record(place.Id, CurationAction.Reclassified, actorId, detail: kind.ToString());
+        }
+
         if (r.Verified is { } v && v != place.Verified)
         {
             place.Verified = v;

@@ -17,4 +17,5 @@ public enum CurationAction
     Deleted,
     ExternalIdAdded,
     ExternalIdRemoved,
+    Reclassified,
 }

@@ -1849,6 +1849,75 @@
         ]
       }
     },
+    "/curation/classify-areas": {
+      "post": {
+        "tags": [
+          "Curation"
+        ],
+        "summary": "Reclassify uncategorized geocoded places whose cached geocode matched a settlement or administrative area (city, municipality, region, country) from Poi to Area. Dry run unless apply=true; reads the geocode cache only.",
+        "operationId": "ClassifyAreaPlaces",
+        "parameters": [
+          {
+            "name": "apply",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AreaReclassificationDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
     "/geocode/reverse": {
       "get": {
         "tags": [
@@ -2490,6 +2559,31 @@
         ],
         "description": "Level of an AdminArea in the containment tree (Locality → Region → Country)."
       },
+      "AreaReclassificationDto": {
+        "required": [
+          "placeId",
+          "name",
+          "osmId",
+          "applied"
+        ],
+        "type": "object",
+        "properties": {
+          "placeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "osmId": {
+            "type": "string"
+          },
+          "applied": {
+            "type": "boolean"
+          }
+        },
+        "description": "A place the area sweep reclassifies (or, on a dry run, would reclassify) from `Poi` to `Area`."
+      },
       "CreatePlaceFromGeocodeRequest": {
         "required": [
           "query",
@@ -2624,7 +2718,8 @@
           "Relocated",
           "Deleted",
           "ExternalIdAdded",
-          "ExternalIdRemoved"
+          "ExternalIdRemoved",
+          "Reclassified"
         ],
         "description": "A curation decision recorded on a Place in the append-only `curation_log`. Stable names —\n            they are the future event-type names, so never rename a member (add new ones; keep old ones readable)."
       },
@@ -3071,9 +3166,10 @@
       "PlaceKind": {
         "enum": [
           "Poi",
-          "Address"
+          "Address",
+          "Area"
         ],
-        "description": "What a Place is: a point-of-interest (a named venue/entity) or a plain street address."
+        "description": "What a Place is: a point-of-interest (a named venue/entity), a plain street address, or a whole\n            settlement/administrative area (city, municipality, region, country) — a centroid, not somewhere you arrive."
       },
       "PlaceLookupItemDto": {
         "required": [
@@ -3467,6 +3563,16 @@
               }
             ]
           },
+          "kind": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PlaceKind"
+              }
+            ]
+          },
           "verified": {
             "type": [
               "null",
@@ -3501,7 +3607,7 @@
             "format": "uuid"
           }
         },
-        "description": "Curate a place: rename, recategorize, verify, or correct its location. Omitted members are left unchanged.\n            `Latitude`+`Longitude` (both required together) move the point — for fixing a wrong geocode by hand;\n            `WithinAreaId` re-anchors containment to match."
+        "description": "Curate a place: rename, recategorize, reclassify, verify, or correct its location. Omitted members are left\n            unchanged. `Latitude`+`Longitude` (both required together) move the point — for fixing a wrong geocode by\n            hand; `WithinAreaId` re-anchors containment to match."
       },
       "UpdateSavedPlaceRequest": {
         "type": "object",
