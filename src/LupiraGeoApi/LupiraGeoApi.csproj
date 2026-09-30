@@ -21,7 +21,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Expose internal helpers to the integration test assembly. -->
+    <!-- Expose internal helpers to the test assemblies. -->
+    <InternalsVisibleTo Include="LupiraGeoApi.UnitTests" />
     <InternalsVisibleTo Include="LupiraGeoApi.IntegrationTests" />
   </ItemGroup>
 

@@ -55,7 +55,9 @@ builder.Services.Configure<BasemapOptions>(builder.Configuration.GetSection(Base
 
 // MCP server for the agent (read-only find/get/reverse-geocode tools), mounted at /mcp over Streamable HTTP.
 // LAN/WireGuard-only — not published through the tunnel (see UseLanOnlySurfaces + the MapMcp call below).
-builder.Services.AddMcpServer().WithHttpTransport().WithTools<GeoTools>();
+builder.Services.AddMcpServer().WithHttpTransport()
+    .WithRequestFilters(f => f.AddCallToolFilter(StrictToolArguments.Filter))
+    .WithTools<GeoTools>();
 
 builder.Services.ConfigureHttpJsonOptions(o =>
 {
