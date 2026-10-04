@@ -78,17 +78,17 @@ public static class PlacesEndpoints
 
         group.MapPost("/{id:guid}/merge", (Guid id, MergePlaceRequest r, PlacesHandler h, CancellationToken ct) => h.MergeAsync(id, r, ct))
             .WithName("MergePlace")
-            .WithSummary("Merge a duplicate into the survivor (intoPlaceId): names become aliases, external ids and saved places move over, and the duplicate id keeps resolving via a tombstone redirect.")
+            .WithSummary("Merge a duplicate into the survivor (intoPlaceId): names become aliases, saved places move over, and the duplicate id keeps resolving via a tombstone redirect. The survivor's own fields win; the duplicate only fills what it lacks (coordinates, address, containment and OSM id only when the survivor has no coordinates).")
             .Produces<PlaceDto>(StatusCodes.Status200OK).ProducesProblem(StatusCodes.Status404NotFound).ProducesProblem(StatusCodes.Status400BadRequest).ProducesProblem(StatusCodes.Status409Conflict);
 
         group.MapPost("/{id:guid}/regeocode", (Guid id, bool? force, PlacesHandler h, CancellationToken ct) => h.RegeocodeAsync(id, force ?? false, ct))
             .WithName("RegeocodePlace")
-            .WithSummary("Re-geocode a place from its address/name and attach coordinates, containment, and OSM id — heals a coordinate-less stub or refreshes a stale fix. force=true bypasses and overwrites the frozen geocode cache (heals a frozen empty answer). 400 on a no-hit or transient geocoder outage; the place is left unchanged.")
+            .WithSummary("Re-geocode a place from its address/name and attach coordinates, containment, and OSM id — heals a coordinate-less stub or refreshes a stale fix. A frozen empty geocode answer is always re-asked; force=true also bypasses and overwrites frozen hits. 400 on a no-hit or transient geocoder outage; the place is left unchanged.")
             .Produces<PlaceDto>(StatusCodes.Status200OK).ProducesProblem(StatusCodes.Status404NotFound).ProducesProblem(StatusCodes.Status400BadRequest);
 
         group.MapPost("/regeocode:batch", (RegeocodePlacesBatchRequest r, PlacesHandler h, CancellationToken ct) => h.RegeocodeBatchAsync(r, ct))
             .WithName("RegeocodePlacesBatch")
-            .WithSummary("Regeocode up to 50 places in one call — the bulk healing path for unlocated stubs. Per-item status (Healed/NoHit/Unavailable/Conflict/NotFound); a failure never aborts the rest. force=true bypasses the frozen geocode cache.")
+            .WithSummary("Regeocode up to 50 places in one call — the bulk healing path for unlocated stubs. Per-item status (Healed/NoHit/Unavailable/Conflict/NotFound); a failure never aborts the rest. Frozen empty geocode answers are always re-asked; force=true also bypasses frozen hits.")
             .Produces<List<RegeocodePlaceResultDto>>(StatusCodes.Status200OK).ProducesProblem(StatusCodes.Status400BadRequest);
 
         group.MapDelete("/{id:guid}", (Guid id, PlacesHandler h, CancellationToken ct) => h.DeleteAsync(id, ct))

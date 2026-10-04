@@ -9,8 +9,9 @@ namespace LupiraGeoApi.Core.Application.Places;
 
 /// <summary>Merges a duplicate place into a survivor. The loser becomes a tombstone redirect
 /// (<see cref="Place.MergedIntoId"/>) so place ids held by other services keep resolving: names move over as aliases,
-/// external ids move, the survivor's missing fields are filled, and saved places re-point. Cross-store by necessity —
-/// EF (gazetteer) commits first, then Marten (saved places); not atomic, but re-running the same merge converges.</summary>
+/// the survivor's own fields win and the loser only fills what it lacks, and saved places re-point. Cross-store by
+/// necessity — EF (gazetteer) commits first, then Marten (saved places); not atomic, but re-running the same merge
+/// converges.</summary>
 // Marten's namespace stays un-imported: its LINQ extensions collide with EF's on the shared IQueryable surface.
 public sealed class PlaceMergeService(GeoDbContext db, Marten.IDocumentSession session)
 {
@@ -46,10 +47,16 @@ public sealed class PlaceMergeService(GeoDbContext db, Marten.IDocumentSession s
         db.PlaceAliases.RemoveRange(loser.Aliases);
         loser.Aliases.Clear();
 
+        // The loser's address, containment and OSM id come from the loser's own geocode; next to the survivor's
+        // coordinates they would describe a different spot, so a located survivor keeps its fix whole.
+        var winnerHasFix = winner.Location is not null;
+        var winnerSchemes = winner.ExternalIds.Select(x => x.Scheme).ToHashSet();
         foreach (var ext in loser.ExternalIds.ToList())
         {
-            if (winner.ExternalIds.Any(w => w.Scheme == ext.Scheme && w.Value == ext.Value))
+            if (winnerSchemes.Contains(ext.Scheme) || (ext.Scheme == ExternalScheme.Osm && winnerHasFix))
             {
+                if (!winner.ExternalIds.Any(w => w.Scheme == ext.Scheme && w.Value == ext.Value))
+                    db.Record(loser.Id, CurationAction.ExternalIdRemoved, actorId, detail: $"{ext.Scheme}:{ext.Value}");
                 db.PlaceExternalIds.Remove(ext);
                 continue;
             }
@@ -60,9 +67,13 @@ public sealed class PlaceMergeService(GeoDbContext db, Marten.IDocumentSession s
 
         loser.ExternalIds.Clear();
 
-        winner.Location ??= loser.Location;
-        winner.FormattedAddress ??= loser.FormattedAddress;
-        winner.WithinAreaId ??= loser.WithinAreaId;
+        if (!winnerHasFix)
+        {
+            winner.Location = loser.Location;
+            winner.FormattedAddress ??= loser.FormattedAddress;
+            winner.WithinAreaId ??= loser.WithinAreaId;
+        }
+
         if (winner.Category == PlaceCategory.Unknown) winner.Category = loser.Category;
         winner.Verified |= loser.Verified;
 

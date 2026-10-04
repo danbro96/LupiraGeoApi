@@ -120,9 +120,12 @@ aliases, and area names) over places **and** `AdminArea` localities, merged and 
 Aliases (`POST/DELETE /places/{id}/aliases…`) carry alternate names; resolve and suggest match them. Duplicates are
 merged (`POST /places/{id}/merge` → `intoPlaceId`) with a **tombstone redirect**: the loser keeps its row with
 `MergedIntoId` set, so place ids held by other services (cal) keep resolving — reads by id follow the chain, every
-search excludes tombstones. Names move over as aliases, external ids move (unique `(Scheme,Value)` respected), the
-survivor's missing fields fill in from the loser, and saved places re-point (EF commits first, then Marten — two
-commits, not atomic; re-running the same merge converges). Verify stays a plain `PATCH` (`verified: true`).
+search excludes tombstones. Names move over as aliases and saved places re-point (EF commits first, then Marten — two
+commits, not atomic; re-running the same merge converges). The survivor's own fields win; the loser only fills what the
+survivor lacks. Coordinates, address, containment and OSM id are one geocode fix, taken from the loser only when the
+survivor has no coordinates. Other external ids move only for schemes the survivor lacks; the rest are dropped (logged
+`ExternalIdRemoved` on the loser). `--report-merge-overwrites` lists earlier merges that left the loser's address or
+OSM id on the survivor, read-only. Verify stays a plain `PATCH` (`verified: true`).
 
 Every curation decision (create/verify/rename/recategorize/alias±/merge) appends a `CurationEvent` in the **same
 transaction** as the change — an unbackfillable actor+timestamp trail, and the replay seed if curation is ever
@@ -134,7 +137,8 @@ conventions any future event stream must follow.
 
 `GeocodingService` does forward (`/search`) and reverse (`/reverse`) geocoding, resolve-once-and-freeze into
 `GeocodeCache` — reverse keyed by a ~100 m quantized grid cell, forward by the normalized query, both via a
-deterministic id so retries upsert. Two endpoints, tried in order (`NominatimOptions`): the self-hosted regional
+deterministic id so retries upsert. Forward hits stay frozen; an empty forward answer expires after a day, and
+regeocode always re-asks it (`force=true` also bypasses frozen hits). Two endpoints, tried in order (`NominatimOptions`): the self-hosted regional
 instance (`Nominatim:BaseUrl`), then an optional public fallback (`Nominatim:FallbackBaseUrl`) for queries outside the
 regional extract's coverage — throttled through `NominatimRateGate` (singleton, ≥1.1 s between requests, per the
 public usage policy) with an identifying `Nominatim:UserAgent`. Whichever endpoint answers is frozen, so a foreign

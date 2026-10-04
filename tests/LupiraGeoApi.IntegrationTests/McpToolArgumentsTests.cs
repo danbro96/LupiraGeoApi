@@ -1,3 +1,5 @@
+using System.Net.Http.Json;
+using LupiraGeoApi.Core.Dtos.Places;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
 using Xunit;
@@ -49,6 +51,27 @@ public sealed class McpToolArgumentsTests(GeoApiTestFactory factory) : Integrati
         var result = await mcp.CallToolAsync("search_places", new Dictionary<string, object?> { ["q"] = "Torsby" });
 
         Assert.NotEqual(true, result.IsError);
+    }
+
+    [Fact]
+    public async Task Remove_place_alias_removes_it_like_rest()
+    {
+        var api = Factory.ApiClient("alice@x.test");
+        var place = (await (await api.PostAsJsonAsync("/places", new CreatePlaceRequest { Name = "Stockholms centralstation" }))
+            .Content.ReadFromJsonAsync<PlaceDto>())!;
+        var withAlias = (await (await api.PostAsJsonAsync($"/places/{place.Id}/aliases", new AddAliasRequest { Name = "Centralen" }))
+            .Content.ReadFromJsonAsync<PlaceDto>())!;
+        var aliasId = withAlias.Aliases.Single().Id;
+
+        await using var mcp = await ConnectAsync();
+        var result = await mcp.CallToolAsync("remove_place_alias", new Dictionary<string, object?> { ["id"] = place.Id, ["aliasId"] = aliasId });
+        Assert.NotEqual(true, result.IsError);
+
+        var got = (await api.GetFromJsonAsync<PlaceDto>($"/places/{place.Id}"))!;
+        Assert.Empty(got.Aliases);
+
+        var again = await mcp.CallToolAsync("remove_place_alias", new Dictionary<string, object?> { ["id"] = place.Id, ["aliasId"] = aliasId });
+        Assert.True(again.IsError);
     }
 
     [Fact]

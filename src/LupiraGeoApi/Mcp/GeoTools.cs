@@ -188,7 +188,7 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
     [Description("Re-run geocoding for an existing place from its address/name and attach the coordinates, containment chain, and OSM id — heals a coordinate-less provisional stub (or refreshes a stale fix). Leaves the place unchanged on a no-hit or a transient geocoder outage.")]
     public async Task<PlaceDto> RegeocodePlace(
         [Description("Place id.")] Guid id,
-        [Description("Bypass and overwrite the frozen geocode cache for this place's query — use when an earlier empty answer was frozen and the place can't heal.")] bool force = false,
+        [Description("Also bypass and overwrite a frozen non-empty geocode answer for this place's query — use to refresh a stale fix. Frozen empty answers are always re-asked.")] bool force = false,
         CancellationToken ct = default)
     {
         var u = await user.GetAsync(ct);
@@ -199,7 +199,7 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
     [Description("Regeocode up to 50 places in one call — the bulk healing path for the list_unlocated worklist. Each item comes back with a status (Healed/NoHit/Unavailable/Conflict/NotFound); a per-item failure never aborts the rest. Unavailable means the geocoder was unreachable — re-run just those ids.")]
     public async Task<List<RegeocodePlaceResultDto>> RegeocodePlaces(
         [Description("Place ids to regeocode (max 50).")] List<Guid> placeIds,
-        [Description("Bypass and overwrite the frozen geocode cache for each query — use when earlier empty answers were frozen.")] bool force = false,
+        [Description("Also bypass and overwrite frozen non-empty geocode answers — use to refresh stale fixes. Frozen empty answers are always re-asked.")] bool force = false,
         CancellationToken ct = default)
     {
         var u = await user.GetAsync(ct);
@@ -207,7 +207,7 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
     }
 
     [McpServerTool(Name = "merge_places")]
-    [Description("Merge a duplicate place into the survivor (intoPlaceId): the duplicate's names become aliases, its external ids and saved places move over, and the duplicate id keeps resolving via a tombstone redirect. Use for genuine duplicates — for a WRONG entry with no correct survivor, use delete_place instead (merge would drag the wrong external ids onto the survivor).")]
+    [Description("Merge a duplicate place into the survivor (intoPlaceId): the duplicate's names become aliases, its saved places move over, and the duplicate id keeps resolving via a tombstone redirect. The survivor's own fields win: the duplicate only fills what the survivor lacks (its coordinates, address, containment and OSM id only when the survivor has no coordinates; other external ids only for schemes the survivor lacks). Use for genuine duplicates — for a WRONG entry with no correct survivor, use delete_place instead.")]
     public async Task<PlaceDto> MergePlaces(
         [Description("The duplicate to merge away.")] Guid sourceId,
         [Description("The survivor to merge into.")] Guid intoPlaceId,
@@ -236,6 +236,18 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
     {
         var u = await user.GetAsync(ct);
         return Require(await places.AddAliasAsync(id, new AddAliasRequest { Name = name, Lang = lang }, u.Id, ct));
+    }
+
+    [McpServerTool(Name = "remove_place_alias")]
+    [Description("Remove an alternate name from a place — e.g. a wrong alias a merge carried over. Returns the updated place. Not-found if the place has no such alias.")]
+    public async Task<PlaceDto> RemovePlaceAlias(
+        [Description("Place id.")] Guid id,
+        [Description("Alias id (from the place's aliases, via get_place).")] Guid aliasId,
+        CancellationToken ct = default)
+    {
+        var u = await user.GetAsync(ct);
+        RequireOk(await places.RemoveAliasAsync(id, aliasId, u.Id, ct));
+        return Require(await places.GetAsync(id, ct));
     }
 
     [McpServerTool(Name = "add_place_external_id")]

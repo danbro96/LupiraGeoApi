@@ -53,7 +53,7 @@ public sealed class GeoApiTestFactory : WebApplicationFactory<Program>
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<GeoDbContext>();
         await db.Database.ExecuteSqlRawAsync(
-            "TRUNCATE geo.\"Places\", geo.\"PlaceAliases\", geo.\"PlaceExternalIds\", geo.\"AdminAreas\" CASCADE");
+            "TRUNCATE geo.\"Places\", geo.\"PlaceAliases\", geo.\"PlaceExternalIds\", geo.\"AdminAreas\", geo.\"CurationLog\" CASCADE");
     }
 
     public HttpClient ApiClient(string email)

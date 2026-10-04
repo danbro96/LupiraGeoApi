@@ -13,9 +13,13 @@ public sealed class PlaceMergeTests(GeoApiTestFactory factory) : IntegrationTest
 {
     const string Email = "alice@x.test";
 
-    private static async Task<PlaceDto> CreateAsync(HttpClient api, string name, double? lat = null, double? lon = null, PlaceCategory category = PlaceCategory.Unknown)
+    private static async Task<PlaceDto> CreateAsync(
+        HttpClient api, string name, double? lat = null, double? lon = null, PlaceCategory category = PlaceCategory.Unknown, string? address = null)
     {
-        var resp = await api.PostAsJsonAsync("/places", new CreatePlaceRequest { Name = name, Latitude = lat, Longitude = lon, Category = category });
+        var resp = await api.PostAsJsonAsync("/places", new CreatePlaceRequest
+        {
+            Name = name, Latitude = lat, Longitude = lon, Category = category, FormattedAddress = address,
+        });
         resp.EnsureSuccessStatusCode();
         return (await resp.Content.ReadFromJsonAsync<PlaceDto>())!;
     }
@@ -55,16 +59,66 @@ public sealed class PlaceMergeTests(GeoApiTestFactory factory) : IntegrationTest
         Assert.Equal(winner.Id, saved.Single().PlaceId);
     }
 
+    private static async Task AddExternalIdAsync(HttpClient api, Guid id, ExternalScheme scheme, string value) =>
+        (await api.PostAsJsonAsync($"/places/{id}/external-ids", new AddExternalIdRequest { Scheme = scheme, Value = value }))
+            .EnsureSuccessStatusCode();
+
     [Fact]
     public async Task Merge_fills_missing_fields_from_the_loser()
     {
         var api = Factory.ApiClient(Email);
         var winner = await CreateAsync(api, "Cafe Central");
-        var loser = await CreateAsync(api, "Cafe Central Annex", 59.3293, 18.0686, PlaceCategory.Cafe);
+        var loser = await CreateAsync(api, "Cafe Central Annex", 59.3293, 18.0686, PlaceCategory.Cafe, "Vasagatan 1, Stockholm");
+        await AddExternalIdAsync(api, loser.Id, ExternalScheme.Osm, "node/11");
 
         var merged = await MergeAsync(api, loser.Id, winner.Id);
-        Assert.NotNull(merged.Latitude);
+        Assert.Equal(59.3293, merged.Latitude);
+        Assert.Equal("Vasagatan 1, Stockholm", merged.FormattedAddress);
+        Assert.Contains(merged.ExternalIds, x => x is { Scheme: ExternalScheme.Osm, Value: "node/11" });
         Assert.Equal(PlaceCategory.Cafe, merged.Category);
+    }
+
+    [Fact]
+    public async Task Located_survivor_keeps_its_own_fix_and_drops_the_losers_osm_id()
+    {
+        var api = Factory.ApiClient(Email);
+        var winner = await CreateAsync(api, "Mulle Meck i Glada Hudik", 61.7278494, 17.1084592, PlaceCategory.Landmark);
+        var loser = await CreateAsync(api, "Mulle Meck", 59.33, 18.21, PlaceCategory.Store, "Käppuddsgatan 1, Lidingö");
+        await AddExternalIdAsync(api, loser.Id, ExternalScheme.Osm, "node/1375840275");
+        await AddExternalIdAsync(api, loser.Id, ExternalScheme.Wikidata, "Q1");
+
+        var merged = await MergeAsync(api, loser.Id, winner.Id);
+
+        Assert.Equal(61.7278494, merged.Latitude);
+        Assert.Equal(17.1084592, merged.Longitude);
+        Assert.Null(merged.FormattedAddress);
+        Assert.Equal("Mulle Meck i Glada Hudik", merged.Name);
+        Assert.Equal(PlaceCategory.Landmark, merged.Category);
+        Assert.DoesNotContain(merged.ExternalIds, x => x.Scheme == ExternalScheme.Osm);
+        Assert.Contains(merged.ExternalIds, x => x is { Scheme: ExternalScheme.Wikidata, Value: "Q1" });
+        Assert.Contains(merged.Aliases, a => a.Name == "Mulle Meck");
+
+        var byOsm = await api.GetAsync("/places/by-external/Osm/node/1375840275");
+        Assert.Equal(HttpStatusCode.NotFound, byOsm.StatusCode);
+
+        var history = (await api.GetFromJsonAsync<List<CurationEventDto>>($"/places/{loser.Id}/history"))!;
+        Assert.Contains(history, e => e.Action == CurationAction.ExternalIdRemoved && e.Detail == "Osm:node/1375840275");
+    }
+
+    [Fact]
+    public async Task Survivor_keeps_its_external_id_where_the_loser_has_one_of_the_same_scheme()
+    {
+        var api = Factory.ApiClient(Email);
+        var winner = await CreateAsync(api, "Kulturhuset");
+        var loser = await CreateAsync(api, "Kulturhuset Stadsteatern");
+        await AddExternalIdAsync(api, winner.Id, ExternalScheme.Wikidata, "Q2");
+        await AddExternalIdAsync(api, loser.Id, ExternalScheme.Wikidata, "Q3");
+        await AddExternalIdAsync(api, loser.Id, ExternalScheme.Osm, "way/7");
+
+        var merged = await MergeAsync(api, loser.Id, winner.Id);
+
+        Assert.Equal("Q2", Assert.Single(merged.ExternalIds, x => x.Scheme == ExternalScheme.Wikidata).Value);
+        Assert.Contains(merged.ExternalIds, x => x is { Scheme: ExternalScheme.Osm, Value: "way/7" });
     }
 
     [Fact]

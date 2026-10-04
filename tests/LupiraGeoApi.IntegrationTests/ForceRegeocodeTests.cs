@@ -7,8 +7,8 @@ using Xunit;
 
 namespace LupiraGeoApi.IntegrationTests;
 
-/// <summary>Healing a stub whose empty geocode answer got frozen: plain regeocode keeps serving the frozen empty
-/// (and must not spend outbound calls); force=true bypasses the read and overwrites the frozen row.</summary>
+/// <summary>Healing a stub whose empty geocode answer got frozen: regeocode always re-asks a frozen empty answer;
+/// force=true also bypasses frozen hits.</summary>
 [Collection("geocoding")]
 public sealed class ForceRegeocodeTests(GeocodingFixture fx) : IAsyncLifetime
 {
@@ -27,7 +27,7 @@ public sealed class ForceRegeocodeTests(GeocodingFixture fx) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Force_overwrites_a_frozen_empty_answer_and_heals_the_stub()
+    public async Task Plain_regeocode_reasks_a_fresh_frozen_empty_answer_and_heals_the_stub()
     {
         var api = fx.Factory.ApiClient(Email);
 
@@ -38,17 +38,11 @@ public sealed class ForceRegeocodeTests(GeocodingFixture fx) : IAsyncLifetime
         Assert.Equal(PlaceResolution.Provisional, resolved.Resolution);
         Assert.Null(resolved.Latitude);
 
-        // The world improves, but the frozen empty still answers: no force -> 400, zero outbound calls.
         fx.Fallback.ReturnResults = true;
-        var (p0, f0) = (fx.Primary.SearchCalls, fx.Fallback.SearchCalls);
+        var f0 = fx.Fallback.SearchCalls;
         var plain = await api.PostAsync($"/places/{resolved.PlaceId}/regeocode", null);
-        Assert.Equal(HttpStatusCode.BadRequest, plain.StatusCode);
-        Assert.Equal((p0, f0), (fx.Primary.SearchCalls, fx.Fallback.SearchCalls));
-
-        // force=true bypasses the cache, heals the place, and overwrites the frozen row.
-        var forced = await api.PostAsync($"/places/{resolved.PlaceId}/regeocode?force=true", null);
-        forced.EnsureSuccessStatusCode();
-        var healed = (await forced.Content.ReadFromJsonAsync<PlaceDto>())!;
+        plain.EnsureSuccessStatusCode();
+        var healed = (await plain.Content.ReadFromJsonAsync<PlaceDto>())!;
         Assert.NotNull(healed.Latitude);
         Assert.Equal(PlaceSource.Geocoded, healed.Source);
         Assert.True(fx.Fallback.SearchCalls > f0);
@@ -58,6 +52,24 @@ public sealed class ForceRegeocodeTests(GeocodingFixture fx) : IAsyncLifetime
         var fwd = (await api.GetFromJsonAsync<List<GeocodeResultDto>>("/geocode/forward?q=Shibuya%20Crossing"))!;
         Assert.NotEmpty(fwd);
         Assert.Equal((p1, f1), (fx.Primary.SearchCalls, fx.Fallback.SearchCalls));
+    }
+
+    [Fact]
+    public async Task Plain_regeocode_serves_frozen_hits_and_force_bypasses_them()
+    {
+        var api = fx.Factory.ApiClient(Email);
+        var resolved = (await (await api.PostAsJsonAsync("/places/resolve", new ResolvePlaceRequest { Text = "Shibuya Crossing" }))
+            .Content.ReadFromJsonAsync<ResolvePlaceResponse>())!;
+        Assert.Equal(PlaceResolution.Geocoded, resolved.Resolution);
+
+        // The first regeocode asks for the place's address, a query not frozen yet.
+        (await api.PostAsync($"/places/{resolved.PlaceId}/regeocode", null)).EnsureSuccessStatusCode();
+        var (p0, f0) = (fx.Primary.SearchCalls, fx.Fallback.SearchCalls);
+        (await api.PostAsync($"/places/{resolved.PlaceId}/regeocode", null)).EnsureSuccessStatusCode();
+        Assert.Equal((p0, f0), (fx.Primary.SearchCalls, fx.Fallback.SearchCalls));
+
+        (await api.PostAsync($"/places/{resolved.PlaceId}/regeocode?force=true", null)).EnsureSuccessStatusCode();
+        Assert.True(fx.Fallback.SearchCalls > f0);
     }
 
     [Fact]

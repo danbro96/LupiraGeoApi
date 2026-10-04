@@ -281,6 +281,31 @@ if (args.Contains("--seed-gazetteer"))
     return;
 }
 
+// Read-only audit (`dotnet LupiraGeoApi.dll --report-merge-overwrites`): past merges that left the loser's address or
+// OSM ids on the survivor, listed for hand repair. Writes nothing.
+if (args.Contains("--report-merge-overwrites"))
+{
+    await using var scope = app.Services.CreateAsyncScope();
+    var findings = await scope.ServiceProvider.GetRequiredService<MergeOverwriteReport>().FindAsync();
+    foreach (var f in findings)
+    {
+        Console.WriteLine(string.Create(
+            CultureInfo.InvariantCulture,
+            $"#{f.Seq} {f.At:yyyy-MM-dd} \"{f.LoserName}\" ({f.LoserId}) -> \"{f.SurvivorName}\" ({f.SurvivorId})"));
+        if (f.InheritedAddress is { } address)
+            Console.WriteLine($"  address: (none) -> \"{address}\" (the loser's)");
+        if (f.InheritedOsmIds.Count > 0)
+        {
+            var before = f.OsmIds.Except(f.InheritedOsmIds.Select(i => i.Value));
+            Console.WriteLine($"  osm: [{string.Join(", ", before)}] -> [{string.Join(", ", f.OsmIds)}]; from the loser: "
+                + string.Join(", ", f.InheritedOsmIds.Select(i => $"{i.Value} ({i.Evidence})")));
+        }
+    }
+
+    Console.WriteLine($"{findings.Count} merge(s) left the loser's address or OSM ids on the survivor.");
+    return;
+}
+
 // In Development, bring the EF gazetteer schema up on boot (Marten self-applies via CreateOrUpdate).
 if (app.Environment.IsDevelopment())
 {

@@ -273,8 +273,8 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
 
     /// <summary>Re-run forward geocoding for a place from its address/name and attach the coordinates, containment
     /// chain, and OSM id — heals a coordinate-less provisional stub (or refreshes a stale fix). Leaves the place
-    /// unchanged on a no-hit or a transient geocoder outage. <paramref name="force"/> bypasses and overwrites the
-    /// frozen geocode cache — the only way to heal a stub whose empty answer got frozen.</summary>
+    /// unchanged on a no-hit or a transient geocoder outage. A frozen empty answer is always re-asked;
+    /// <paramref name="force"/> also bypasses and overwrites frozen hits.</summary>
     public async Task<OpResult<PlaceDto>> RegeocodeAsync(Guid id, Guid actorId, bool force = false, CancellationToken ct = default)
     {
         var (status, place, error) = await RegeocodeCoreAsync(id, actorId, force, ct);
@@ -326,7 +326,8 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
         if (place is null) return (RegeocodeStatus.NotFound, null, "Not found.");
 
         var query = string.IsNullOrWhiteSpace(place.FormattedAddress) ? place.CanonicalName : place.FormattedAddress!;
-        var result = await geocoder.ForwardAsync(query, limit: 1, bypassCache: force, ct: ct);
+        var result = await geocoder.ForwardAsync(
+            query, limit: 1, force ? ForwardCacheMode.Bypass : ForwardCacheMode.RetryEmpty, ct);
         if (result.Status == GeocodeStatus.Unavailable)
             return (RegeocodeStatus.Unavailable, null, "Geocoder unavailable; retry.");
         if (result.Hits.FirstOrDefault() is not { } hit)

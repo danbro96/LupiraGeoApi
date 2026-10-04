@@ -22,7 +22,7 @@ public sealed class GeocodingService(
     public const string PrimaryClientName = "nominatim";
     public const string FallbackClientName = "nominatim-fallback";
 
-    private static readonly TimeSpan EmptyAnswerTtl = TimeSpan.FromDays(30);
+    private static readonly TimeSpan EmptyAnswerTtl = TimeSpan.FromDays(1);
 
     // More than asked: the right hit can rank below a rejected one (Katrineholm's Valla is 4th for "640 23 Valla").
     private const int CandidatePool = 10;
@@ -94,10 +94,10 @@ public sealed class GeocodingService(
         }
     }
 
-    /// <summary><paramref name="bypassCache"/> skips only the cache read — whatever answers is written through the
-    /// normal upsert, overwriting a frozen row (the heal path for a frozen empty answer); an <see cref="GeocodeStatus.Unavailable"/>
-    /// outcome writes nothing, so an outage can't destroy a previously good frozen answer.</summary>
-    public async Task<ForwardResult> ForwardAsync(string query, int limit = 5, bool bypassCache = false, CancellationToken ct = default)
+    /// <summary>An <see cref="GeocodeStatus.Unavailable"/> outcome writes nothing, so an outage can't destroy a
+    /// previously frozen answer in any <paramref name="cacheMode"/>.</summary>
+    public async Task<ForwardResult> ForwardAsync(
+        string query, int limit = 5, ForwardCacheMode cacheMode = ForwardCacheMode.Default, CancellationToken ct = default)
     {
         query = query.Trim();
         if (query.Length == 0) return ForwardResult.Empty;
@@ -107,13 +107,14 @@ public sealed class GeocodingService(
             ParseArray(root).Where(h => ForwardHitFilter.Accepts(query, h, regional)).Take(limit).ToList();
 
         var id = GeocodeCache.ForwardId(query);
-        if (!bypassCache && await session.LoadAsync<GeocodeCache>(id, ct) is { } cached)
+        if (cacheMode != ForwardCacheMode.Bypass && await session.LoadAsync<GeocodeCache>(id, ct) is { } cached)
         {
             using var cdoc = JsonDocument.Parse(cached.Payload);
             var cachedHits = Accepted(cdoc.RootElement);
-            // A frozen empty answer would otherwise make a provisional stub unhealable without force=true; OSM does
-            // get the missing address eventually. Hits stay frozen forever — those don't move. All-rejected = empty.
-            if (cachedHits.Count > 0 || DateTimeOffset.UtcNow - cached.ResolvedAt < EmptyAnswerTtl)
+            // Hits stay frozen forever — those don't move. An empty (or all-rejected) answer only holds briefly: OSM
+            // gets the missing address eventually, and a stale empty would keep a stub unhealable.
+            if (cachedHits.Count > 0
+                || (cacheMode == ForwardCacheMode.Default && DateTimeOffset.UtcNow - cached.ResolvedAt < EmptyAnswerTtl))
                 return ForwardResult.FromHits(cachedHits);
         }
 
