@@ -1,4 +1,5 @@
 using System.Globalization;
+using Lupira.Primitives;
 
 namespace LupiraGeoApi.Core.Domain;
 

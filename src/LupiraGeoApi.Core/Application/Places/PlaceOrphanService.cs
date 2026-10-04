@@ -1,5 +1,5 @@
+using Lupira.Results;
 using LupiraGeoApi.Core.Abstractions;
-using LupiraGeoApi.Core.Application.Results;
 using LupiraGeoApi.Core.Data;
 using LupiraGeoApi.Core.Domain;
 using LupiraGeoApi.Core.Dtos.Curation;

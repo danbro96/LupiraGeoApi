@@ -2,9 +2,10 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 # Copy both project files before restore (the host references Core) so layer caching works.
+COPY nuget.config Directory.Build.props ./
 COPY src/LupiraGeoApi/LupiraGeoApi.csproj src/LupiraGeoApi/
 COPY src/LupiraGeoApi.Core/LupiraGeoApi.Core.csproj src/LupiraGeoApi.Core/
-RUN dotnet restore src/LupiraGeoApi/LupiraGeoApi.csproj
+RUN --mount=type=secret,id=packages_token,env=PACKAGES_TOKEN dotnet restore src/LupiraGeoApi/LupiraGeoApi.csproj
 COPY . .
 RUN dotnet publish src/LupiraGeoApi/LupiraGeoApi.csproj -c Release -o /app --no-restore
 

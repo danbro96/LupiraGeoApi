@@ -1,5 +1,5 @@
 using JasperFx; // ConcurrencyException moved here in Marten 9 (JasperFx core).
-using LupiraGeoApi.Core.Application.Results;
+using Lupira.Results;
 using LupiraGeoApi.Core.Data;
 using LupiraGeoApi.Core.Domain;
 using LupiraGeoApi.Core.Dtos.SavedPlaces;

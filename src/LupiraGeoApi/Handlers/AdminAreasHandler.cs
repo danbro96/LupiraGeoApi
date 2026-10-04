@@ -1,7 +1,7 @@
+using Lupira.Hosting.Problems;
 using LupiraGeoApi.Core.Application.Places;
 using LupiraGeoApi.Core.Domain;
 using LupiraGeoApi.Core.Dtos.AdminAreas;
-using LupiraGeoApi.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace LupiraGeoApi.Handlers;

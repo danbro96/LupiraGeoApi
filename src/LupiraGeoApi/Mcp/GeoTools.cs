@@ -1,15 +1,14 @@
 using System.ComponentModel;
+using Lupira.Mcp;
 using LupiraGeoApi.Auth;
 using LupiraGeoApi.Core.Application.Geocoding;
 using LupiraGeoApi.Core.Application.Places;
-using LupiraGeoApi.Core.Application.Results;
 using LupiraGeoApi.Core.Domain;
 using LupiraGeoApi.Core.Dtos.Curation;
 using LupiraGeoApi.Core.Dtos.Geocoding;
 using LupiraGeoApi.Core.Dtos.Places;
 using LupiraGeoApi.Core.Dtos.SavedPlaces;
 using LupiraGeoApi.Core.Mappers;
-using ModelContextProtocol;
 using ModelContextProtocol.Server;
 
 namespace LupiraGeoApi.Mcp;
@@ -29,7 +28,7 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         [Description("Search radius in metres (default 5000).")] double? radiusM = null,
         [Description("Max results (default 20).")] int? limit = null,
         CancellationToken ct = default) =>
-        Require(await places.SearchAsync(q, null, null, null, null, null, null, nearLat, nearLon, radiusM, null, limit ?? 20, ct));
+        (await places.SearchAsync(q, null, null, null, null, null, null, nearLat, nearLon, radiusM, null, limit ?? 20, ct)).Require();
 
     [McpServerTool(Name = "suggest_places")]
     [Description("Typeahead: ranked suggestions over gazetteer places (names + aliases) and seeded localities. Prefix matches rank first, then trigram similarity. q must be at least 2 characters; Locality suggestions are admin-area ids, not place ids.")]
@@ -37,12 +36,12 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         [Description("Partial name being typed.")] string q,
         [Description("Max suggestions (default 10).")] int? limit = null,
         CancellationToken ct = default) =>
-        Require(await places.SuggestAsync(q, limit, ct));
+        (await places.SuggestAsync(q, limit, ct)).Require();
 
     [McpServerTool(Name = "get_place")]
     [Description("Fetch a single place by id, with its containment chain.")]
     public async Task<PlaceDto> GetPlace([Description("Place id.")] Guid id, CancellationToken ct = default) =>
-        Require(await places.GetAsync(id, ct));
+        (await places.GetAsync(id, ct)).Require();
 
     [McpServerTool(Name = "reverse_geocode")]
     [Description("Resolve a coordinate to a coarse place label + structured address.")]
@@ -63,7 +62,7 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
     public async Task<List<SavedPlaceDto>> ListSavedPlaces(CancellationToken ct = default)
     {
         var u = await user.GetAsync(ct);
-        return Require(await saved.ListAsync(u.Id, ct));
+        return (await saved.ListAsync(u.Id, ct)).Require();
     }
 
     [McpServerTool(Name = "resolve_place")]
@@ -72,7 +71,7 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         [Description("Free-text place/address to resolve.")] string text, CancellationToken ct = default)
     {
         var u = await user.GetAsync(ct);
-        return Require(await places.ResolveAsync(text, u.Id, ct));
+        return (await places.ResolveAsync(text, u.Id, ct)).Require();
     }
 
     [McpServerTool(Name = "resolve_places")]
@@ -81,7 +80,7 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         [Description("Texts to resolve (max 50).")] List<string> texts, CancellationToken ct = default)
     {
         var u = await user.GetAsync(ct);
-        return Require(await places.ResolveBatchAsync(texts, u.Id, ct));
+        return (await places.ResolveBatchAsync(texts, u.Id, ct)).Require();
     }
 
     [McpServerTool(Name = "create_place")]
@@ -97,17 +96,17 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         CancellationToken ct = default)
     {
         var u = await user.GetAsync(ct);
-        return Require(await places.CreateAsync(
+        return (await places.CreateAsync(
             new CreatePlaceRequest
-        {
-            Name = name,
-            Kind = kind,
-            Category = category,
-            Latitude = latitude,
-            Longitude = longitude,
-            FormattedAddress = formattedAddress,
-            WithinAreaId = withinAreaId,
-        }, u.Id, ct));
+            {
+                Name = name,
+                Kind = kind,
+                Category = category,
+                Latitude = latitude,
+                Longitude = longitude,
+                FormattedAddress = formattedAddress,
+                WithinAreaId = withinAreaId,
+            }, u.Id, ct)).Require();
     }
 
     [McpServerTool(Name = "update_place")]
@@ -125,7 +124,7 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         CancellationToken ct = default)
     {
         var u = await user.GetAsync(ct);
-        return Require(await places.UpdateAsync(id, new UpdatePlaceRequest
+        return (await places.UpdateAsync(id, new UpdatePlaceRequest
         {
             Name = name,
             Category = category,
@@ -135,7 +134,7 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
             Longitude = longitude,
             FormattedAddress = formattedAddress,
             WithinAreaId = withinAreaId,
-        }, u.Id, ct));
+        }, u.Id, ct)).Require();
     }
 
     [McpServerTool(Name = "list_unlocated")]
@@ -145,7 +144,7 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         [Description("Filter by verified flag (optional).")] bool? verified = null,
         [Description("Max results (default 50).")] int? limit = null,
         CancellationToken ct = default) =>
-        Require(await places.SearchAsync(null, null, null, null, false, source, verified, null, null, null, null, limit, ct));
+        (await places.SearchAsync(null, null, null, null, false, source, verified, null, null, null, null, limit, ct)).Require();
 
     [McpServerTool(Name = "list_duplicate_candidates")]
     [Description("Duplicate candidates for a curation pass: places sharing a match key (reason=SameName), plus co-located places with similar names (reason=CoLocated). Read-only — review each cluster and merge_places the losers into the best survivor (the one with coordinates). Loosen with radiusM/minSimilarity to catch pairs whose labels differ more.")]
@@ -154,12 +153,12 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         [Description("Trigram name-similarity floor for co-located pairs, 0-1 (default 0.3).")] double? minSimilarity = null,
         [Description("Max clusters (default 50).")] int? limit = null,
         CancellationToken ct = default) =>
-        Require(await duplicates.FindAsync(radiusM, minSimilarity, limit, ct));
+        (await duplicates.FindAsync(radiusM, minSimilarity, limit, ct)).Require();
 
     [McpServerTool(Name = "list_orphans")]
     [Description("Live places nothing references — cross-checked against contact addresses, calendar items (live + soft-deleted counted separately), and saved places. Prunable=false means only soft-deleted calendar items still reference it. Fails when a reference source is unreachable rather than declaring orphans on partial data.")]
     public async Task<List<OrphanCandidateDto>> ListOrphans(CancellationToken ct = default) =>
-        Require(await orphans.FindOrphansAsync(ct));
+        (await orphans.FindOrphansAsync(ct)).Require();
 
     [McpServerTool(Name = "prune_places")]
     [Description("SOFT-DELETE orphan places (max 100). References are re-checked per id at prune time; anything still referenced (or referenced only by soft-deleted calendar items) is skipped with status Referenced. Not reversible via the API — confirm the ids with list_orphans first.")]
@@ -167,7 +166,7 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         [Description("Place ids to prune (from list_orphans).")] List<Guid> placeIds, CancellationToken ct = default)
     {
         var u = await user.GetAsync(ct);
-        return Require(await orphans.PruneAsync(placeIds, u.Id, ct));
+        return (await orphans.PruneAsync(placeIds, u.Id, ct)).Require();
     }
 
     [McpServerTool(Name = "classify_area_places")]
@@ -176,13 +175,13 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         [Description("Apply the reclassification (default false: report only).")] bool apply = false, CancellationToken ct = default)
     {
         var u = await user.GetAsync(ct);
-        return Require(await areas.SweepAsync(apply, u.Id, ct));
+        return (await areas.SweepAsync(apply, u.Id, ct)).Require();
     }
 
     [McpServerTool(Name = "get_place_history")]
     [Description("The append-only curation log for a place, oldest first (created/renamed/verified/merged/regeocoded/deleted, with actor and detail). Readable for tombstoned/merged places too.")]
     public async Task<List<CurationEventDto>> GetPlaceHistory([Description("Place id.")] Guid id, CancellationToken ct = default) =>
-        Require(await places.HistoryAsync(id, ct));
+        (await places.HistoryAsync(id, ct)).Require();
 
     [McpServerTool(Name = "regeocode_place")]
     [Description("Re-run geocoding for an existing place from its address/name and attach the coordinates, containment chain, and OSM id — heals a coordinate-less provisional stub (or refreshes a stale fix). Leaves the place unchanged on a no-hit or a transient geocoder outage.")]
@@ -192,7 +191,7 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         CancellationToken ct = default)
     {
         var u = await user.GetAsync(ct);
-        return Require(await places.RegeocodeAsync(id, u.Id, force, ct));
+        return (await places.RegeocodeAsync(id, u.Id, force, ct)).Require();
     }
 
     [McpServerTool(Name = "regeocode_places")]
@@ -203,7 +202,7 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         CancellationToken ct = default)
     {
         var u = await user.GetAsync(ct);
-        return Require(await places.RegeocodeBatchAsync(placeIds, u.Id, force, ct));
+        return (await places.RegeocodeBatchAsync(placeIds, u.Id, force, ct)).Require();
     }
 
     [McpServerTool(Name = "merge_places")]
@@ -214,7 +213,7 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         CancellationToken ct = default)
     {
         var u = await user.GetAsync(ct);
-        return Require(await merges.MergeAsync(sourceId, intoPlaceId, u.Id, ct));
+        return (await merges.MergeAsync(sourceId, intoPlaceId, u.Id, ct)).Require();
     }
 
     [McpServerTool(Name = "delete_place")]
@@ -222,7 +221,7 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
     public async Task<string> DeletePlace([Description("Place id.")] Guid id, CancellationToken ct = default)
     {
         var u = await user.GetAsync(ct);
-        RequireOk(await places.DeleteAsync(id, u.Id, ct));
+        (await places.DeleteAsync(id, u.Id, ct)).Require();
         return $"Deleted {id}.";
     }
 
@@ -235,7 +234,7 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         CancellationToken ct = default)
     {
         var u = await user.GetAsync(ct);
-        return Require(await places.AddAliasAsync(id, new AddAliasRequest { Name = name, Lang = lang }, u.Id, ct));
+        return (await places.AddAliasAsync(id, new AddAliasRequest { Name = name, Lang = lang }, u.Id, ct)).Require();
     }
 
     [McpServerTool(Name = "remove_place_alias")]
@@ -246,8 +245,8 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         CancellationToken ct = default)
     {
         var u = await user.GetAsync(ct);
-        RequireOk(await places.RemoveAliasAsync(id, aliasId, u.Id, ct));
-        return Require(await places.GetAsync(id, ct));
+        (await places.RemoveAliasAsync(id, aliasId, u.Id, ct)).Require();
+        return (await places.GetAsync(id, ct)).Require();
     }
 
     [McpServerTool(Name = "add_place_external_id")]
@@ -259,7 +258,7 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         CancellationToken ct = default)
     {
         var u = await user.GetAsync(ct);
-        return Require(await places.AddExternalIdAsync(id, new AddExternalIdRequest { Scheme = scheme, Value = value }, u.Id, ct));
+        return (await places.AddExternalIdAsync(id, new AddExternalIdRequest { Scheme = scheme, Value = value }, u.Id, ct)).Require();
     }
 
     [McpServerTool(Name = "remove_place_external_id")]
@@ -271,8 +270,8 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         CancellationToken ct = default)
     {
         var u = await user.GetAsync(ct);
-        RequireOk(await places.RemoveExternalIdAsync(id, scheme, value, u.Id, ct));
-        return Require(await places.GetAsync(id, ct));
+        (await places.RemoveExternalIdAsync(id, scheme, value, u.Id, ct)).Require();
+        return (await places.GetAsync(id, ct)).Require();
     }
 
     [McpServerTool(Name = "save_place")]
@@ -288,7 +287,7 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         CancellationToken ct = default)
     {
         var u = await user.GetAsync(ct);
-        return Require(await saved.CreateAsync(u.Id, new CreateSavedPlaceRequest
+        return (await saved.CreateAsync(u.Id, new CreateSavedPlaceRequest
         {
             Label = label,
             PlaceId = placeId,
@@ -297,7 +296,7 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
             Icon = icon,
             Notes = notes,
             IsFavorite = isFavorite,
-        }, ct));
+        }, ct)).Require();
     }
 
     [McpServerTool(Name = "update_saved_place")]
@@ -314,7 +313,7 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         CancellationToken ct = default)
     {
         var u = await user.GetAsync(ct);
-        return Require(await saved.UpdateAsync(u.Id, id, new UpdateSavedPlaceRequest
+        return (await saved.UpdateAsync(u.Id, id, new UpdateSavedPlaceRequest
         {
             Label = label,
             PlaceId = placeId,
@@ -323,7 +322,7 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
             Icon = icon,
             Notes = notes,
             IsFavorite = isFavorite,
-        }, ct));
+        }, ct)).Require();
     }
 
     [McpServerTool(Name = "delete_saved_place")]
@@ -331,28 +330,7 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
     public async Task<string> DeleteSavedPlace([Description("Saved place id (from list_saved_places).")] Guid id, CancellationToken ct = default)
     {
         var u = await user.GetAsync(ct);
-        RequireOk(await saved.DeleteAsync(u.Id, id, ct));
+        (await saved.DeleteAsync(u.Id, id, ct)).Require();
         return $"Deleted saved place {id}.";
-    }
-
-    private static T Require<T>(OpResult<T> r) => r.Status switch
-    {
-        OpStatus.Ok => r.Value!,
-        OpStatus.NotFound => throw new McpException("Not found."),
-        OpStatus.Invalid => throw new McpException(r.Error ?? "Invalid request."),
-        OpStatus.Forbidden => throw new McpException(r.Error ?? "Forbidden."),
-        _ => throw new McpException(r.Error ?? "Request failed."),
-    };
-
-    private static void RequireOk(OpResult r)
-    {
-        if (r.Status == OpStatus.Ok) return;
-        throw r.Status switch
-        {
-            OpStatus.NotFound => new McpException("Not found."),
-            OpStatus.Invalid => new McpException(r.Error ?? "Invalid request."),
-            OpStatus.Forbidden => new McpException(r.Error ?? "Forbidden."),
-            _ => new McpException(r.Error ?? "Request failed."),
-        };
     }
 }

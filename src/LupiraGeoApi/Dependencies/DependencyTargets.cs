@@ -1,3 +1,4 @@
+using Lupira.Depz;
 using LupiraGeoApi.Core.Application.Geocoding;
 using Microsoft.Extensions.Options;
 
@@ -10,6 +11,7 @@ public static class DependencyTargets
     public static IReadOnlyList<DependencyTarget> From(IOptions<NominatimOptions> nominatim, IConfiguration config)
     {
         var opts = nominatim.Value;
+        var userAgent = string.IsNullOrWhiteSpace(opts.UserAgent) ? null : new StaticHeaderProbeCredential("User-Agent", opts.UserAgent);
         return
         [
             new DependencyTarget
@@ -18,21 +20,21 @@ public static class DependencyTargets
                 BaseUrl = opts.BaseUrl ?? string.Empty,
                 // A trivially cheap reverse lookup: /status is not exposed by every Nominatim build.
                 ProbePath = "search?format=jsonv2&limit=1&q=a",
-                UserAgent = opts.UserAgent,
+                Credential = userAgent,
             },
             new DependencyTarget
             {
                 Name = "nominatim-public",
                 BaseUrl = opts.FallbackBaseUrl ?? string.Empty,
                 ProbePath = "search?format=jsonv2&limit=1&q=a",
-                UserAgent = opts.UserAgent,
+                Credential = userAgent,
             },
             new DependencyTarget
             {
                 Name = "geonames",
                 BaseUrl = config["Geonames:BaseUrl"] is { Length: > 0 } b ? b : "https://download.geonames.org/export/dump",
                 ProbePath = "readme.txt",
-                UserAgent = opts.UserAgent,
+                Credential = userAgent,
             },
         ];
     }
