@@ -1,29 +1,23 @@
 using System.Net.Http.Json;
+using Lupira.Testing.Mcp;
+using Lupira.Testing.Postgres;
 using LupiraGeoApi.Core.Dtos.Places;
-using ModelContextProtocol.Client;
-using ModelContextProtocol.Protocol;
 using Xunit;
 
 namespace LupiraGeoApi.IntegrationTests;
 
 /// <summary>Over the real MCP transport, a call with names the tool schema doesn't declare is refused with a readable
 /// error instead of an opaque one or a silently dropped argument.</summary>
-public sealed class McpToolArgumentsTests(GeoApiTestFactory factory) : IntegrationTest(factory)
+[Collection("integration")]
+public sealed class McpToolArgumentsTests(GeoApiTestFactory factory) : McpStrictArgumentsTests
 {
-    private async Task<McpClient> ConnectAsync()
-    {
-        var http = Factory.ApiClient("alice@x.test");
-        var transport = new HttpClientTransport(
-            new HttpClientTransportOptions { Endpoint = new Uri(http.BaseAddress!, "/mcp"), TransportMode = HttpTransportMode.StreamableHttp },
-            http, ownsHttpClient: true);
-        return await McpClient.CreateAsync(transport);
-    }
+    protected override HttpClient CreateAuthenticatedClient() => factory.ApiClient("alice@x.test");
 
-    private static string ErrorText(CallToolResult result)
-    {
-        Assert.True(result.IsError);
-        return Assert.IsType<TextContentBlock>(Assert.Single(result.Content)).Text;
-    }
+    protected override string DeclaredToolName => "search_places";
+
+    protected override IReadOnlyDictionary<string, object?> DeclaredToolArguments => new Dictionary<string, object?> { ["q"] = "Torsby" };
+
+    public override Task InitializeAsync() => factory.ResetAsync();
 
     [Fact]
     public async Task Misnamed_required_argument_names_both_sides()
@@ -45,18 +39,9 @@ public sealed class McpToolArgumentsTests(GeoApiTestFactory factory) : Integrati
     }
 
     [Fact]
-    public async Task Declared_arguments_reach_the_tool()
-    {
-        await using var mcp = await ConnectAsync();
-        var result = await mcp.CallToolAsync("search_places", new Dictionary<string, object?> { ["q"] = "Torsby" });
-
-        Assert.NotEqual(true, result.IsError);
-    }
-
-    [Fact]
     public async Task Remove_place_alias_removes_it_like_rest()
     {
-        var api = Factory.ApiClient("alice@x.test");
+        var api = factory.ApiClient("alice@x.test");
         var place = (await (await api.PostAsJsonAsync("/places", new CreatePlaceRequest { Name = "Stockholms centralstation" }))
             .Content.ReadFromJsonAsync<PlaceDto>())!;
         var withAlias = (await (await api.PostAsJsonAsync($"/places/{place.Id}/aliases", new AddAliasRequest { Name = "Centralen" }))
@@ -72,19 +57,5 @@ public sealed class McpToolArgumentsTests(GeoApiTestFactory factory) : Integrati
 
         var again = await mcp.CallToolAsync("remove_place_alias", new Dictionary<string, object?> { ["id"] = place.Id, ["aliasId"] = aliasId });
         Assert.True(again.IsError);
-    }
-
-    [Fact]
-    public async Task Every_tool_rejects_an_undeclared_argument()
-    {
-        await using var mcp = await ConnectAsync();
-        var tools = await mcp.ListToolsAsync();
-        Assert.NotEmpty(tools);
-        foreach (var tool in tools)
-        {
-            var result = await mcp.CallToolAsync(tool.Name, new Dictionary<string, object?> { ["__undeclared"] = 1 });
-
-            Assert.StartsWith($"Invalid arguments for '{tool.Name}': unknown __undeclared", ErrorText(result));
-        }
     }
 }

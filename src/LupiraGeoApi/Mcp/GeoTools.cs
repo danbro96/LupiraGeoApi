@@ -1,6 +1,6 @@
 using System.ComponentModel;
+using Lupira.Identity.Marten.AspNetCore;
 using Lupira.Mcp;
-using LupiraGeoApi.Auth;
 using LupiraGeoApi.Core.Application.Geocoding;
 using LupiraGeoApi.Core.Application.Places;
 using LupiraGeoApi.Core.Domain;

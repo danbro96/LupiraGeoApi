@@ -1,4 +1,5 @@
 using System.Net;
+using Lupira.Testing.Postgres;
 using Xunit;
 
 namespace LupiraGeoApi.IntegrationTests;

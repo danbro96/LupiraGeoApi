@@ -1,11 +1,8 @@
+using Lupira.Testing.Postgres;
 using LupiraGeoApi.Core.Data;
 using Marten;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Testcontainers.PostgreSql;
 
 namespace LupiraGeoApi.IntegrationTests;
 
@@ -15,60 +12,33 @@ namespace LupiraGeoApi.IntegrationTests;
 /// <c>geo_user</c> schema and the EF <c>geo</c> schema are applied once; data is reset per test. Nominatim is left unset,
 /// so geocoding is disabled and the resolver provisions user places (no network in tests).
 /// </summary>
-public sealed class GeoApiTestFactory : WebApplicationFactory<Program>
+public sealed class GeoApiTestFactory() : LupiraApiFactory<Program>(PostgresImages.PostGis)
 {
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgis/postgis:17-3.5").Build();
-    private bool _schemaApplied;
-
-    public GeoApiTestFactory() => _postgres.StartAsync().GetAwaiter().GetResult();
-
     /// <summary>Extra config keys (e.g. Nominatim stub URLs) — populate before the first client is created.</summary>
     public Dictionary<string, string?> ExtraConfig { get; } = [];
 
-    protected override void ConfigureWebHost(IWebHostBuilder builder)
-    {
-        builder.UseEnvironment("Development");
-        builder.ConfigureAppConfiguration(cfg =>
-            cfg.AddInMemoryCollection(new Dictionary<string, string?>(ExtraConfig)
-            {
-                ["ConnectionStrings:Postgres"] = _postgres.GetConnectionString(),
-                // Never contacted (tests auth via X-Dev-User) — feeds the RFC 9728 metadata + JWT challenge.
-                ["Auth:Oidc:Authority"] = "https://auth.test/application/o/lupira-geo/",
-            }));
-    }
+    protected override string AuthentikSlug => "lupira-geo";
 
     public IDocumentStore Store => Services.GetRequiredService<IDocumentStore>();
 
-    /// <summary>Ensure both schemas exist (once), then wipe all Marten documents and all EF gazetteer rows.</summary>
-    public async Task ResetAsync()
+    protected override void AddSettings(IDictionary<string, string?> settings)
     {
-        if (!_schemaApplied)
-        {
-            await Store.Storage.ApplyAllConfiguredChangesToDatabaseAsync();
-            using var initScope = Services.CreateScope();
-            await initScope.ServiceProvider.GetRequiredService<GeoDbContext>().Database.MigrateAsync();
-            _schemaApplied = true;
-        }
+        foreach (var (key, value) in ExtraConfig) settings[key] = value;
+    }
+
+    protected override async Task ApplySchemaAsync()
+    {
+        await Store.Storage.ApplyAllConfiguredChangesToDatabaseAsync();
+        using var scope = Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<GeoDbContext>().Database.MigrateAsync();
+    }
+
+    protected override async Task ResetDataAsync()
+    {
         await Store.Advanced.ResetAllData();
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<GeoDbContext>();
         await db.Database.ExecuteSqlRawAsync(
             "TRUNCATE geo.\"Places\", geo.\"PlaceAliases\", geo.\"PlaceExternalIds\", geo.\"AdminAreas\", geo.\"CurationLog\" CASCADE");
-    }
-
-    public HttpClient ApiClient(string email)
-    {
-        var client = CreateClient();
-        client.DefaultRequestHeaders.Add("X-Dev-User", email);
-        return client;
-    }
-
-    /// <summary>A client with no auth header — for asserting unauthenticated requests are rejected.</summary>
-    public HttpClient AnonymousClient() => CreateClient();
-
-    protected override void Dispose(bool disposing)
-    {
-        base.Dispose(disposing);
-        if (disposing) _postgres.DisposeAsync().AsTask().GetAwaiter().GetResult();
     }
 }

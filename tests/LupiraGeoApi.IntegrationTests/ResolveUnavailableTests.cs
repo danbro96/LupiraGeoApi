@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using Lupira.Testing.Postgres;
 using LupiraGeoApi.Core.Domain;
 using LupiraGeoApi.Core.Dtos.Places;
 using Xunit;

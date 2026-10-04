@@ -1,5 +1,5 @@
 using Lupira.Hosting.Problems;
-using LupiraGeoApi.Auth;
+using Lupira.Identity.Marten.AspNetCore;
 using LupiraGeoApi.Core.Application.Places;
 using LupiraGeoApi.Core.Dtos.SavedPlaces;
 using Microsoft.AspNetCore.Http.HttpResults;

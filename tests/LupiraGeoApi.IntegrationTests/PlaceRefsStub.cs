@@ -16,8 +16,8 @@ public sealed class PlaceRefsStub : IAsyncDisposable
 
     public string BaseUrl { get; private set; } = "";
 
-    /// <summary>placeId → contact address count.</summary>
-    public ConcurrentDictionary<Guid, int> ContactRefs { get; } = new();
+    /// <summary>placeId → (live, deleted) contact address counts.</summary>
+    public ConcurrentDictionary<Guid, (int Live, int Deleted)> ContactRefs { get; } = new();
 
     /// <summary>placeId → (live, deleted) calendar item counts.</summary>
     public ConcurrentDictionary<Guid, (int Live, int Deleted)> CalendarRefs { get; } = new();
@@ -45,7 +45,7 @@ public sealed class PlaceRefsStub : IAsyncDisposable
             var ids = await ReadIdsAsync(ctx);
             lock (stub.ContactRequests) stub.ContactRequests.Add(ids);
             var places = ids.Where(stub.ContactRefs.ContainsKey)
-                .Select(id => new { placeId = id, count = stub.ContactRefs[id] });
+                .Select(id => new { placeId = id, liveCount = stub.ContactRefs[id].Live, deletedCount = stub.ContactRefs[id].Deleted });
             return Results.Json(new { places });
         });
 

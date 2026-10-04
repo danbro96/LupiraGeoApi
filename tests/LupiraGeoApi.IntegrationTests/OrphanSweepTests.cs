@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Lupira.Testing.Postgres;
 using LupiraGeoApi.Core.Domain;
 using LupiraGeoApi.Core.Dtos.Curation;
 using LupiraGeoApi.Core.Dtos.Places;
@@ -56,7 +57,7 @@ public sealed class OrphanSweepTests(OrphanSweepFixture fx) : IAsyncLifetime
         var byCalendar = await CreateAsync(api, "Meeting Spot");
         var bySaved = await CreateAsync(api, "Fishing Lake");
 
-        fx.Refs.ContactRefs[byContact.Id] = 1;
+        fx.Refs.ContactRefs[byContact.Id] = (1, 0);
         fx.Refs.CalendarRefs[byCalendar.Id] = (2, 0);
         (await api.PostAsJsonAsync("/me/places", new CreateSavedPlaceRequest { Label = "Lake", PlaceId = bySaved.Id }))
             .EnsureSuccessStatusCode();
@@ -80,7 +81,7 @@ public sealed class OrphanSweepTests(OrphanSweepFixture fx) : IAsyncLifetime
         (await api.PostAsJsonAsync($"/places/{loser.Id}/merge", new MergePlaceRequest { IntoPlaceId = survivor.Id }))
             .EnsureSuccessStatusCode();
 
-        fx.Refs.ContactRefs[loser.Id] = 1;   // a contact still holds the pre-merge id
+        fx.Refs.ContactRefs[loser.Id] = (1, 0);   // a contact still holds the pre-merge id
 
         var candidates = await FindAsync(api);
         Assert.DoesNotContain(survivor.Id, candidates.Select(c => c.PlaceId));
@@ -108,6 +109,20 @@ public sealed class OrphanSweepTests(OrphanSweepFixture fx) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Deleted_contact_only_references_block_prune()
+    {
+        var api = fx.Factory.ApiClient(Email);
+        var place = await CreateAsync(api, "Old Home");
+        fx.Refs.ContactRefs[place.Id] = (0, 2);
+
+        Assert.DoesNotContain(place.Id, (await FindAsync(api)).Select(c => c.PlaceId));
+
+        var result = Assert.Single(await PruneAsync(api, place.Id));
+        Assert.Equal(PruneStatus.Referenced, result.Status);
+        Assert.Equal(HttpStatusCode.OK, (await api.GetAsync($"/places/{place.Id}")).StatusCode);
+    }
+
+    [Fact]
     public async Task Prune_soft_deletes_and_is_idempotent()
     {
         var api = fx.Factory.ApiClient(Email);
@@ -128,7 +143,7 @@ public sealed class OrphanSweepTests(OrphanSweepFixture fx) : IAsyncLifetime
         var place = await CreateAsync(api, "Suddenly Popular");
         Assert.Contains(place.Id, (await FindAsync(api)).Select(c => c.PlaceId));
 
-        fx.Refs.ContactRefs[place.Id] = 1;   // referenced after the find
+        fx.Refs.ContactRefs[place.Id] = (1, 0);   // referenced after the find
 
         var result = Assert.Single(await PruneAsync(api, place.Id));
         Assert.Equal(PruneStatus.Referenced, result.Status);

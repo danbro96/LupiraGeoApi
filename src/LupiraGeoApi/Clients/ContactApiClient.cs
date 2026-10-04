@@ -10,14 +10,7 @@ public sealed class ContactApiClient(HttpClient http, IOptions<ContactApiOptions
 {
     public async Task<IReadOnlyList<PlaceReferenceCount>?> CheckAsync(IReadOnlyList<Guid> placeIds, CancellationToken ct = default)
     {
-        var refs = await CheckAsync<ContactRef>("internal/contacts/place-references:check", e => e.Places, placeIds, ct);
-        return refs is null ? null : [.. refs.Select(r => new PlaceReferenceCount(r.PlaceId, r.Count))];
-    }
-
-    private sealed class ContactRef
-    {
-        public Guid PlaceId { get; set; }
-
-        public int Count { get; set; }
+        var refs = await CheckAsync("internal/contacts/place-references:check", placeIds, ct);
+        return refs is null ? null : [.. refs.Select(r => new PlaceReferenceCount(r.PlaceId, r.LiveCount + r.DeletedCount))];
     }
 }

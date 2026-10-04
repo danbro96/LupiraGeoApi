@@ -10,16 +10,7 @@ public sealed class CalendarApiClient(HttpClient http, IOptions<CalendarApiOptio
 {
     public async Task<IReadOnlyList<CalendarPlaceReference>?> CheckAsync(IReadOnlyList<Guid> placeIds, CancellationToken ct = default)
     {
-        var refs = await CheckAsync<ItemRef>("internal/items/place-references:check", e => e.Places, placeIds, ct);
+        var refs = await CheckAsync("internal/items/place-references:check", placeIds, ct);
         return refs is null ? null : [.. refs.Select(r => new CalendarPlaceReference(r.PlaceId, r.LiveCount, r.DeletedCount))];
-    }
-
-    private sealed class ItemRef
-    {
-        public Guid PlaceId { get; set; }
-
-        public int LiveCount { get; set; }
-
-        public int DeletedCount { get; set; }
     }
 }

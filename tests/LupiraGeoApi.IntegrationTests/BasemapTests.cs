@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using Lupira.Testing.Postgres;
 using LupiraGeoApi.Endpoints;
 using Xunit;
 

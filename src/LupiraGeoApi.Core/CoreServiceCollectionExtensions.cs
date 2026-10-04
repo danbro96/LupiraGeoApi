@@ -1,5 +1,5 @@
 using JasperFx;
-using LupiraGeoApi.Core.Application;
+using Lupira.Identity.Marten;
 using LupiraGeoApi.Core.Data;
 using Marten;
 using Microsoft.EntityFrameworkCore;
@@ -44,7 +44,7 @@ public static class CoreServiceCollectionExtensions
             });
         });
 
-        services.AddScoped<PrincipalDirectory>();
+        services.AddLupiraPrincipalDirectory();
         services.AddGeoServices();
         return services;
     }

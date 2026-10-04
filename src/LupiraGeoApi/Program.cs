@@ -1,13 +1,15 @@
-using System.Globalization;
-using Lupira.Auth.DevUser;
+using Lupira.Auth.Jwt;
+using Lupira.Clients.ServiceTokens;
 using Lupira.Depz;
 using Lupira.Hosting.Defaults;
 using Lupira.Hosting.Health;
 using Lupira.Hosting.LanEdge;
 using Lupira.Hosting.Observability;
+using Lupira.Hosting.OpenApi;
 using Lupira.Hosting.Problems;
+using Lupira.Identity.Marten.AspNetCore;
 using Lupira.Mcp;
-using LupiraGeoApi.Auth;
+using Lupira.Postgres.Health;
 using LupiraGeoApi.Basemap;
 using LupiraGeoApi.Clients;
 using LupiraGeoApi.Core.Abstractions;
@@ -18,16 +20,11 @@ using LupiraGeoApi.Core.Data;
 using LupiraGeoApi.Dependencies;
 using LupiraGeoApi.Endpoints;
 using LupiraGeoApi.Handlers;
-using LupiraGeoApi.Health;
 using LupiraGeoApi.Mcp;
 using Marten;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using Microsoft.OpenApi;
-using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -36,8 +33,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddGeoCore();
 
 // --- Host-only services: identity (claims -> Core PrincipalDirectory) + the thin REST handlers. ---
-builder.Services.AddHttpContextAccessor();
-builder.Services.AddScoped<CurrentUser>();
+builder.Services.AddLupiraCurrentUser();
 builder.Services.AddScoped<MeHandler>();
 builder.Services.AddScoped<PlacesHandler>();
 builder.Services.AddScoped<GeocodeHandler>();
@@ -48,9 +44,9 @@ builder.Services.AddScoped<CurationHandler>();
 // --- Place-reference sources for the orphan sweep: sibling APIs' /internal seams (service-authed). Options bind
 // lazily (the client reads BaseUrl per call), so unset config ⇒ IsConfigured=false ⇒ the sweep fails closed. ---
 builder.Services.Configure<ContactApiOptions>(builder.Configuration.GetSection(ContactApiOptions.SectionName));
-builder.Services.AddHttpClient<IContactPlaceReferences, ContactApiClient>();
+builder.Services.AddHttpClient<IContactPlaceReferences, ContactApiClient>().AddLupiraServiceToken<ContactApiOptions>();
 builder.Services.Configure<CalendarApiOptions>(builder.Configuration.GetSection(CalendarApiOptions.SectionName));
-builder.Services.AddHttpClient<ICalendarPlaceReferences, CalendarApiClient>();
+builder.Services.AddHttpClient<ICalendarPlaceReferences, CalendarApiClient>().AddLupiraServiceToken<CalendarApiOptions>();
 
 // Self-hosted MapLibre basemap (style + pmtiles + glyphs/sprites); serves nothing until Basemap:AssetsPath is set.
 builder.Services.Configure<BasemapOptions>(builder.Configuration.GetSection(BasemapOptions.SectionName));
@@ -67,51 +63,9 @@ builder.AddLupiraDefaults(o =>
 
 // --- Auth: OIDC JWT for the REST surface. One identity authority (Authentik); the OIDC `sub` is the only
 //           cross-service join key. ---
-// `dotnet build` regenerates openapi/ via getdocument, which boots this Program with no real config —
-// skip the guard there (and in Development, where the dev-header scheme needs no authority).
-var isOpenApiBuild = Environment.GetCommandLineArgs()
-    .Any(a => a.Contains("getdocument", StringComparison.OrdinalIgnoreCase));
-
-var oidc = builder.Configuration.GetSection(OidcAuthOptions.SectionName).Get<OidcAuthOptions>() ?? new OidcAuthOptions();
-if (!isOpenApiBuild && !builder.Environment.IsDevelopment()
-    && (string.IsNullOrWhiteSpace(oidc.Authority) || string.IsNullOrWhiteSpace(oidc.Audience)))
-    throw new InvalidOperationException("Auth:Oidc Authority + Audience are required outside Development.");
-
-var authBuilder = builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.Authority = oidc.Authority;
-        options.Audience = oidc.Audience;
-        options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
-        options.Events = new JwtBearerEvents
-        {
-            // MCP auth spec: a 401 on /mcp advertises the RFC 9728 metadata so clients can discover the
-            // issuer. HandleResponse suppresses the default bare "Bearer" header so exactly one goes out.
-            OnChallenge = ctx =>
-            {
-                if (ctx.Request.Path.StartsWithSegments("/mcp"))
-                {
-                    ctx.HandleResponse();
-                    ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                    ctx.Response.Headers.WWWAuthenticate =
-                        $"Bearer resource_metadata=\"{McpResourceMetadata.ResourceMetadataUrl(ctx.Request)}\"";
-                }
-
-                return Task.CompletedTask;
-            },
-        };
-    });
-
-// Development-only: allow X-Dev-User header auth so the API can be exercised without Authentik.
-if (builder.Environment.IsDevelopment())
-    authBuilder.AddLupiraDevHeaderAuth();
-
-string[] apiSchemes = builder.Environment.IsDevelopment()
-    ? [JwtBearerDefaults.AuthenticationScheme, DevAuthenticationBuilderExtensions.DefaultScheme]
-    : [JwtBearerDefaults.AuthenticationScheme];
-
-builder.Services.AddAuthorizationBuilder()
-    .AddPolicy("ApiPolicy", p => p.AddAuthenticationSchemes(apiSchemes).RequireAuthenticatedUser());
+builder.AddLupiraJwt();
+var apiSchemes = LupiraJwtSchemes.Api(builder.Environment);
+builder.Services.AddAuthorizationBuilder().AddLupiraApiPolicy(apiSchemes);
 
 builder.AddLupiraTelemetry("lupira-geo-api");
 
@@ -131,98 +85,13 @@ builder.Services.AddSingleton<IDependencyTargetSource>(sp => new StaticDependenc
 
 builder.Services.AddLupiraProblems();
 
-builder.Services.AddOpenApi("v1", options =>
+builder.Services.AddOpenApi("v1", options => options.AddLupiraConventions(o =>
 {
-    options.AddDocumentTransformer((document, context, _) =>
-    {
-        document.Info = new()
-        {
-            Title = "Lupira Geo API",
-            Version = "v1",
-            Description =
-                "Gazetteer, geocoding, and saved-places backend for Lupira. " +
-                "Authenticate with a Bearer token issued by the OIDC provider (Authentik).",
-        };
-        document.Components ??= new();
-        document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
-        document.Components.SecuritySchemes["Bearer"] = new OpenApiSecurityScheme
-        {
-            Type = SecuritySchemeType.Http,
-            Scheme = "bearer",
-            BearerFormat = "JWT",
-            Description = "OIDC bearer token. Send as `Authorization: Bearer <token>`.",
-        };
-        document.Components.Schemas ??= new Dictionary<string, IOpenApiSchema>();
-        document.Components.Schemas["ProblemDetails"] = ProblemDetailsSchema();
-        return Task.CompletedTask;
-    });
-    options.AddOperationTransformer((operation, context, _) =>
-    {
-        var endpointMetadata = context.Description.ActionDescriptor.EndpointMetadata;
-        var requiresAuth = endpointMetadata.OfType<IAuthorizeData>().Any()
-                        && !endpointMetadata.OfType<IAllowAnonymous>().Any();
-        if (requiresAuth)
-        {
-            operation.Security ??= new List<OpenApiSecurityRequirement>();
-            operation.Security.Add(new OpenApiSecurityRequirement
-            {
-                [new OpenApiSecuritySchemeReference("Bearer", context.Document)] = new List<string>(),
-            });
-            AddProblem(operation, context.Document, StatusCodes.Status401Unauthorized, "Unauthorized");
-        }
-
-        // The cross-cutting code no endpoint declares — ProblemExceptionHandler produces it.
-
-        AddProblem(operation, context.Document, StatusCodes.Status500InternalServerError, "Internal server error");
-
-        // Bodyless 4xx/5xx come from the non-generic arms of the typed-result unions (NotFound,
-
-        // UnauthorizedHttpResult). UseStatusCodePages fills them at runtime, so declare the shape.
-
-        foreach (var code in operation.Responses?.Keys.ToList() ?? [])
-        {
-            if (code.Length != 3 || code[0] is not ('4' or '5')) continue;
-
-            var existing = operation.Responses![code];
-
-            if (existing.Content is { Count: > 0 }) continue;
-
-            operation.Responses[code] = new OpenApiResponse
-            { Description = existing.Description, Content = ProblemContent(context.Document) };
-        }
-
-        return Task.CompletedTask;
-    });
-});
-
-// Every error response carries the same shape, so a generated client types its error once instead of
-// falling back to `void`.
-static Dictionary<string, OpenApiMediaType> ProblemContent(OpenApiDocument document) =>
-    new() { ["application/problem+json"] = new() { Schema = new OpenApiSchemaReference("ProblemDetails", document) } };
-
-static void AddProblem(OpenApiOperation operation, OpenApiDocument document, int status, string description)
-{
-    var code = status.ToString(CultureInfo.InvariantCulture);
-    operation.Responses ??= [];
-    if (operation.Responses.ContainsKey(code)) return;
-    operation.Responses[code] = new OpenApiResponse { Description = description, Content = ProblemContent(document) };
-}
-
-// RFC 9457. Declared here because nothing returns the CLR type directly, so the generator never emits it.
-static OpenApiSchema ProblemDetailsSchema() => new()
-{
-    Type = JsonSchemaType.Object,
-    Description = "RFC 9457 problem details.",
-    Properties = new Dictionary<string, IOpenApiSchema>
-    {
-        ["type"] = new OpenApiSchema { Type = JsonSchemaType.String | JsonSchemaType.Null },
-        ["title"] = new OpenApiSchema { Type = JsonSchemaType.String | JsonSchemaType.Null },
-        ["status"] = new OpenApiSchema { Type = JsonSchemaType.Integer | JsonSchemaType.Null, Format = "int32" },
-        ["detail"] = new OpenApiSchema { Type = JsonSchemaType.String | JsonSchemaType.Null },
-        ["instance"] = new OpenApiSchema { Type = JsonSchemaType.String | JsonSchemaType.Null },
-        ["traceId"] = new OpenApiSchema { Type = JsonSchemaType.String | JsonSchemaType.Null },
-    },
-};
+    o.Title = "Lupira Geo API";
+    o.Description =
+        "Gazetteer, geocoding, and saved-places backend for Lupira. " +
+        "Authenticate with a Bearer token issued by the OIDC provider (Authentik).";
+}));
 
 var app = builder.Build();
 
@@ -270,15 +139,7 @@ app.UseExceptionHandler();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapOpenApi("/openapi/{documentName}.json").AllowAnonymous();
-app.MapScalarApiReference("/scalar", o => o
-        .WithTitle("Lupira Geo API")
-        .WithTheme(ScalarTheme.BluePlanet))
-    .AllowAnonymous();
-
-app.MapGet("/", () => TypedResults.Redirect("/scalar"))
-   .ExcludeFromDescription()
-   .AllowAnonymous();
+app.MapLupiraOpenApi(o => o.Title = "Lupira Geo API");
 
 app.MapLupiraHealth();
 

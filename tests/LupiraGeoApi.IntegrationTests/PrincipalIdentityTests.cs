@@ -1,5 +1,4 @@
-using LupiraGeoApi.Core.Application;
-using LupiraGeoApi.Core.Domain.Identity;
+using Lupira.Identity.Marten;
 using Marten;
 using Xunit;
 

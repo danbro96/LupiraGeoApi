@@ -18,8 +18,8 @@ Two projects, split on the architectural boundary (same shape as the other Lupir
 ```
 HTTP ─▶ Endpoints/ ─▶ Handlers/ ─▶ Core: Application services ─▶ Marten (geo_user) + EF Core/PostGIS (geo)
   │                       │                     │
-  └─ MCP ─▶ Mcp/GeoTools ─┘                  OpResult ──▶ Http/ (RFC 7807) on the way back
-                       Auth/ (CurrentUser)                Nominatim (geocoding) · GeoNames (seed)
+  └─ MCP ─▶ Mcp/GeoTools ─┘                  OpResult ──▶ OpResultMap (RFC 7807) on the way back
+                       CurrentUser                        Nominatim (geocoding) · GeoNames (seed)
 ```
 
 ## Two storage models, one database
@@ -162,7 +162,7 @@ edge for any request carrying Cloudflare headers.
 ## Error handling & transport
 
 Services return a transport-neutral `OpResult`/`OpResult<T>` (`Ok`/`NotFound`/`Forbidden`/`Invalid`/`Conflict`), mapped
-in `Http/` to typed `Results<...>` unions with RFC 7807 problems. Enums serialize as string names.
+in `Lupira.Hosting.Problems` to typed `Results<...>` unions with RFC 7807 problems. Enums serialize as string names.
 
 ---
 

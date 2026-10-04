@@ -1,5 +1,5 @@
+using Lupira.Identity.Marten;
 using LupiraGeoApi.Core.Domain;
-using LupiraGeoApi.Core.Domain.Identity;
 using Marten;
 using Weasel.Core;
 
@@ -16,9 +16,7 @@ public static class MartenRegistrations
         opts.DatabaseSchemaName = "geo_user";
         opts.UseSystemTextJsonForSerialization(EnumStorage.AsString);
 
-        // Unique sub: without it, concurrent first-sight logins fork one login into two principals.
-        // Email stays non-unique — mutable, and a placeholder row shares it until the sub upgrade lands.
-        opts.Schema.For<Principal>().Index(x => x.AuthentikSub, i => i.IsUnique = true).Index(x => x.Email);
+        opts.AddLupiraPrincipals();
         // Optimistic concurrency: a concurrent edit (e.g. two devices) between load and save throws ConcurrencyException.
         opts.Schema.For<SavedPlace>().Index(x => x.PrincipalId).Index(x => x.PlaceId).UseOptimisticConcurrency(true);
         opts.Schema.For<GeocodeCache>();
