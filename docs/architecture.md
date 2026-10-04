@@ -124,8 +124,7 @@ search excludes tombstones. Names move over as aliases and saved places re-point
 commits, not atomic; re-running the same merge converges). The survivor's own fields win; the loser only fills what the
 survivor lacks. Coordinates, address, containment and OSM id are one geocode fix, taken from the loser only when the
 survivor has no coordinates. Other external ids move only for schemes the survivor lacks; the rest are dropped (logged
-`ExternalIdRemoved` on the loser). `--report-merge-overwrites` lists earlier merges that left the loser's address or
-OSM id on the survivor, read-only. Verify stays a plain `PATCH` (`verified: true`).
+`ExternalIdRemoved` on the loser). Verify stays a plain `PATCH` (`verified: true`).
 
 Every curation decision (create/verify/rename/recategorize/alias±/merge) appends a `CurationEvent` in the **same
 transaction** as the change — an unbackfillable actor+timestamp trail, and the replay seed if curation is ever
