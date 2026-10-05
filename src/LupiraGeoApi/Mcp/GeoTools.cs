@@ -281,7 +281,6 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
         [Description("Gazetteer place id to label (optional if lat/lon given).")] Guid? placeId = null,
         [Description("Raw latitude (optional; use for a private home kept out of the gazetteer).")] double? latitude = null,
         [Description("Raw longitude (optional).")] double? longitude = null,
-        [Description("Icon hint (optional).")] string? icon = null,
         [Description("Free-text note (optional), e.g. 'longest childhood home'.")] string? notes = null,
         [Description("Mark as favorite (default false).")] bool isFavorite = false,
         CancellationToken ct = default)
@@ -293,21 +292,19 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
             PlaceId = placeId,
             Latitude = latitude,
             Longitude = longitude,
-            Icon = icon,
             Notes = notes,
             IsFavorite = isFavorite,
         }, ct)).Require();
     }
 
     [McpServerTool(Name = "update_saved_place")]
-    [Description("Update one of the caller's saved places (owner-scoped): rename, re-icon, annotate, (un)favorite, or re-point it. Omitted fields are left unchanged. Re-point by passing EITHER placeId (link a gazetteer place; clears any raw coordinate) OR latitude+longitude together (set a raw coordinate; clears any link) — not both. Not-found if the id isn't yours.")]
+    [Description("Update one of the caller's saved places (owner-scoped): rename, annotate, (un)favorite, or re-point it. Omitted fields are left unchanged. Re-point by passing EITHER placeId (link a gazetteer place; clears any raw coordinate) OR latitude+longitude together (set a raw coordinate; clears any link) — not both. Not-found if the id isn't yours.")]
     public async Task<SavedPlaceDto> UpdateSavedPlace(
         [Description("Saved place id (from list_saved_places).")] Guid id,
         [Description("New label (optional).")] string? label = null,
         [Description("Re-point to this gazetteer place id (optional; clears raw coordinate).")] Guid? placeId = null,
         [Description("New raw latitude (optional; must accompany longitude; clears place link).")] double? latitude = null,
         [Description("New raw longitude (optional; must accompany latitude).")] double? longitude = null,
-        [Description("Icon hint (optional).")] string? icon = null,
         [Description("Free-text note (optional).")] string? notes = null,
         [Description("Favorite flag (optional).")] bool? isFavorite = null,
         CancellationToken ct = default)
@@ -319,7 +316,6 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
             PlaceId = placeId,
             Latitude = latitude,
             Longitude = longitude,
-            Icon = icon,
             Notes = notes,
             IsFavorite = isFavorite,
         }, ct)).Require();

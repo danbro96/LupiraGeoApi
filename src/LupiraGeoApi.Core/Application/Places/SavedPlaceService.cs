@@ -38,7 +38,6 @@ public sealed class SavedPlaceService(IDocumentSession session, GeoDbContext db)
             RawLat = r.Latitude,
             RawLon = r.Longitude,
             Label = r.Label.Trim(),
-            Icon = r.Icon,
             Notes = string.IsNullOrWhiteSpace(r.Notes) ? null : r.Notes.Trim(),
             IsFavorite = r.IsFavorite,
             CreatedAt = now,
@@ -79,7 +78,6 @@ public sealed class SavedPlaceService(IDocumentSession session, GeoDbContext db)
             saved.Label = label.Trim();
         }
 
-        if (r.Icon is not null) saved.Icon = r.Icon;
         if (r.Notes is not null) saved.Notes = string.IsNullOrWhiteSpace(r.Notes) ? null : r.Notes.Trim();
         if (r.IsFavorite is { } fav) saved.IsFavorite = fav;
         saved.UpdatedAt = DateTimeOffset.UtcNow;
@@ -108,29 +106,34 @@ public sealed class SavedPlaceService(IDocumentSession session, GeoDbContext db)
 
     private async Task<SavedPlaceDto> ToDtoAsync(SavedPlace s, CancellationToken ct) => (await ToDtosAsync([s], ct))[0];
 
-    /// <summary>Map to DTOs, resolving the effective coordinate: raw when raw-backed, else the linked gazetteer place's
-    /// point (batched, one query). <c>PlaceId</c> still distinguishes linked vs raw. A deleted/coordinate-less linked
-    /// place yields null coordinates.</summary>
+    /// <summary>Map to DTOs, resolving the effective coordinate (raw when raw-backed, else the linked gazetteer place's
+    /// point) and the linked place's category (batched, one query). <c>PlaceId</c> still distinguishes linked vs raw. A
+    /// deleted/coordinate-less linked place yields null coordinates; a deleted one yields no category.</summary>
     private async Task<List<SavedPlaceDto>> ToDtosAsync(IReadOnlyList<SavedPlace> rows, CancellationToken ct)
     {
-        var ids = rows.Where(s => s.PlaceId is not null && s.RawLat is null)
-            .Select(s => s.PlaceId!.Value).Distinct().ToList();
+        var ids = rows.Where(s => s.PlaceId is not null).Select(s => s.PlaceId!.Value).Distinct().ToList();
         var coords = new Dictionary<Guid, (double Lat, double Lon)>();
+        var categories = new Dictionary<Guid, PlaceCategory>();
         if (ids.Count > 0)
         {
             // Project the Point and split .Y/.X in memory — ST_X/ST_Y are geometry-only on a geography column.
-            var pts = await EntityFrameworkQueryableExtensions.ToListAsync(
+            var places = await EntityFrameworkQueryableExtensions.ToListAsync(
                 db.Places.AsNoTracking()
-                    .Where(p => ids.Contains(p.Id) && p.Location != null && p.DeletedAt == null)
-                    .Select(p => new { p.Id, p.Location }), ct);
-            foreach (var p in pts) coords[p.Id] = (p.Location!.Y, p.Location.X);
+                    .Where(p => ids.Contains(p.Id) && p.DeletedAt == null)
+                    .Select(p => new { p.Id, p.Location, p.Category }), ct);
+            foreach (var p in places)
+            {
+                categories[p.Id] = p.Category;
+                if (p.Location is not null) coords[p.Id] = (p.Location.Y, p.Location.X);
+            }
         }
 
         return rows.Select(s =>
         {
             var dto = s.ToDto();
-            if (dto.Latitude is null && s.PlaceId is { } pid && coords.TryGetValue(pid, out var c))
-                (dto.Latitude, dto.Longitude) = (c.Lat, c.Lon);
+            if (s.PlaceId is not { } pid) return dto;
+            if (dto.Latitude is null && coords.TryGetValue(pid, out var c)) (dto.Latitude, dto.Longitude) = (c.Lat, c.Lon);
+            if (categories.TryGetValue(pid, out var category)) dto.Category = category;
             return dto;
         }).ToList();
     }

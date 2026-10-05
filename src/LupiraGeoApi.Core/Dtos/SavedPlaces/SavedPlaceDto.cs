@@ -1,3 +1,6 @@
+using System.Text.Json.Serialization;
+using LupiraGeoApi.Core.Domain;
+
 namespace LupiraGeoApi.Core.Dtos.SavedPlaces;
 
 /// <summary>A caller's saved place / personal label. References a gazetteer place, or carries a raw coordinate.</summary>
@@ -13,7 +16,8 @@ public sealed class SavedPlaceDto
 
     public required string Label { get; set; }
 
-    public string? Icon { get; set; }
+    [JsonConverter(typeof(JsonStringEnumConverter<PlaceCategory>))]
+    public PlaceCategory? Category { get; set; }
 
     public string? Notes { get; set; }
 

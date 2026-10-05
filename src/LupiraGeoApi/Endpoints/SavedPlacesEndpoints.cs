@@ -21,7 +21,7 @@ public static class SavedPlacesEndpoints
 
         group.MapPatch("/{id:guid}", (Guid id, UpdateSavedPlaceRequest r, SavedPlacesHandler h, CancellationToken ct) => h.UpdateAsync(id, r, ct))
             .WithName("UpdateSavedPlace")
-            .WithSummary("Rename, re-icon, annotate, or (un)favorite a saved place.")
+            .WithSummary("Rename, annotate, or (un)favorite a saved place.")
             .Produces<SavedPlaceDto>(StatusCodes.Status200OK).ProducesProblem(StatusCodes.Status404NotFound).ProducesProblem(StatusCodes.Status400BadRequest);
 
         group.MapDelete("/{id:guid}", (Guid id, SavedPlacesHandler h, CancellationToken ct) => h.DeleteAsync(id, ct))

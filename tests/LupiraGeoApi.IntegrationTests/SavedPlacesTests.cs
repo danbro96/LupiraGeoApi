@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using Lupira.Testing.Postgres;
+using LupiraGeoApi.Core.Domain;
 using LupiraGeoApi.Core.Dtos.Places;
 using LupiraGeoApi.Core.Dtos.SavedPlaces;
 using Xunit;
@@ -79,6 +80,24 @@ public sealed class SavedPlacesTests(GeoApiTestFactory factory) : IntegrationTes
         Assert.Equal(HttpStatusCode.NotFound, upd.StatusCode);
         var del = await bob.DeleteAsync($"/me/places/{aliceSaved.Id}");
         Assert.Equal(HttpStatusCode.NotFound, del.StatusCode);
+    }
+
+    [Fact]
+    public async Task Linked_saved_place_exposes_the_place_category_and_raw_has_none()
+    {
+        var api = Factory.ApiClient("alice@x.test");
+        var created = await api.PostAsJsonAsync("/places", new CreatePlaceRequest
+        {
+            Name = "Scandic Gdansk", Latitude = 54.3559, Longitude = 18.6465, Category = PlaceCategory.Hotel,
+        });
+        created.EnsureSuccessStatusCode();
+        var place = (await created.Content.ReadFromJsonAsync<PlaceDto>())!;
+        await api.PostAsJsonAsync("/me/places", new CreateSavedPlaceRequest { Label = "Hotel", PlaceId = place.Id });
+        await CreateAsync(api, "Spot");
+
+        var list = (await api.GetFromJsonAsync<List<SavedPlaceDto>>("/me/places"))!;
+        Assert.Equal(PlaceCategory.Hotel, list.Single(s => s.Label == "Hotel").Category);
+        Assert.Null(list.Single(s => s.Label == "Spot").Category);
     }
 
     [Fact]

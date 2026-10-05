@@ -2327,7 +2327,7 @@
         "tags": [
           "SavedPlaces"
         ],
-        "summary": "Rename, re-icon, annotate, or (un)favorite a saved place.",
+        "summary": "Rename, annotate, or (un)favorite a saved place.",
         "operationId": "UpdateSavedPlace",
         "parameters": [
           {
@@ -2686,12 +2686,6 @@
               "number"
             ],
             "format": "double"
-          },
-          "icon": {
-            "type": [
-              "null",
-              "string"
-            ]
           },
           "notes": {
             "type": [
@@ -3519,10 +3513,14 @@
           "label": {
             "type": "string"
           },
-          "icon": {
-            "type": [
-              "null",
-              "string"
+          "category": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PlaceCategory"
+              }
             ]
           },
           "notes": {
@@ -3638,12 +3636,6 @@
               "number"
             ],
             "format": "double"
-          },
-          "icon": {
-            "type": [
-              "null",
-              "string"
-            ]
           },
           "notes": {
             "type": [

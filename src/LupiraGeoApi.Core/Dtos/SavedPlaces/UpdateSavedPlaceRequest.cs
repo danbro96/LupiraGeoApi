@@ -14,8 +14,6 @@ public sealed class UpdateSavedPlaceRequest
 
     public double? Longitude { get; set; }
 
-    public string? Icon { get; set; }
-
     public string? Notes { get; set; }
 
     public bool? IsFavorite { get; set; }

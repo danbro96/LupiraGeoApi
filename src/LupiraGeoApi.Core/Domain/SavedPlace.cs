@@ -20,8 +20,6 @@ public sealed class SavedPlace
 
     public string Label { get; set; } = string.Empty;
 
-    public string? Icon { get; set; }
-
     public string? Notes { get; set; }
 
     public bool IsFavorite { get; set; }
