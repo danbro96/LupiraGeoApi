@@ -23,8 +23,11 @@ public static class GeoServiceCollectionExtensions
             .AddHttpMessageHandler<NominatimThrottleHandler>();
 
         services.AddScoped<GeocodingService>();
+        services.AddScoped<AddressSearchService>();
+        services.TryAddSingleton<IAddressAutocomplete, NullAddressAutocomplete>();
         services.AddScoped<PlaceResolver>();
         services.AddScoped<PlaceQueryService>();
+        services.AddScoped<PlaceCaptureService>();
         services.AddScoped<PlaceMergeService>();
         services.AddScoped<PlaceNameBackfill>();
         services.AddScoped<PlaceDuplicateService>();

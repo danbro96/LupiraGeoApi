@@ -5,10 +5,14 @@ Docs: `docs/` (architecture, event-sourcing).
 ## Scope
 - Geo is atemporal: `Place` is a shared catalog entry, `SavedPlace` a per-user bookmark. No ValidFrom/ValidTo.
 - Periods (residence, employment) and trips belong in LupiraLocationApi, referencing place ids.
-- Private homes: `SavedPlace` with raw coordinates (`forward_geocode` then `save_place`), kept out of the catalog. Institutions and POIs: shared `Place` via `resolve_place`.
+- Addresses (homes included) are catalog `Place`s; residencies reference them by id. Personal labels ("Home") stay `SavedPlace`. Commit a picked hit with `POST /places/from-geocode` (OSM id), a map pin with `POST /places/from-pin`, free text with `resolve_place`.
 - AdminAreas (Country/Region/Locality) have no MCP surface; they are built lazily on geocode.
 
 ## Geocoding
+- Nominatim is the canonical resolver; Photon (`Photon__BaseUrl`, empty = off) is address autocomplete only, behind `IAddressAutocomplete`. Vendor names stay in the adapter.
+- `intent=Typeahead` never reaches the public Nominatim fallback and is never cached. `intent=Search` asks Nominatim (cached), then Photon when Nominatim has nothing.
+- Query enums bind case-sensitively by name: `intent=Typeahead`, `precision=Building`.
+- `from-geocode` without a frozen query hit: `/lookup` regional → public → the client's hit fields as an approximate place. Default names come from address components, never the typed query.
 - `RegeocodeAsync` geocodes `FormattedAddress` verbatim (`CanonicalName` only when blank). A venue-prefixed address misses; heal with a street-only `FormattedAddress`, then `regeocode_place`, which also builds containment.
 - A numbered address geocoded only to its street (or another number) is an approximate fix: coordinates and containment, no OSM id, no `FormattedAddress`. Dedupe never joins different house numbers (`HouseNumber`).
 - `update_place` lat/lon alone does not build containment; regeocode or pass `withinAreaId`.

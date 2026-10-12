@@ -1650,7 +1650,7 @@
         "tags": [
           "Places"
         ],
-        "summary": "Create/dedupe a place from one specific forward-geocode hit the user picked (query + OSM identity). Reuses the frozen geocode cache — no extra geocoder call. 400 if the hit is not among the query's geocode results.",
+        "summary": "Create/dedupe a place from one geocode hit the user picked (OSM identity). Resolved from the query's frozen results when query is given, else by OSM lookup; when the lookup misses, the hit's coordinates and address fields create an approximate place (no OSM id). Name defaults to the hit's name or \"Street HouseNumber, Locality\". 400 when the hit cannot be resolved and no coordinates were passed.",
         "operationId": "CreatePlaceFromGeocode",
         "requestBody": {
           "content": {
@@ -1685,6 +1685,72 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/places/from-pin": {
+      "post": {
+        "tags": [
+          "Places"
+        ],
+        "summary": "Create a place at a dropped pin (exact coordinates), or match one within 25 m with a similar name (resolution Matched/Created). Address and containment come from a building-precision reverse geocode; name defaults to \"Street HouseNumber, Locality\" at the pin, else its coordinates. Created even when the geocoder is down.",
+        "operationId": "CreatePlaceFromPin",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePlaceFromPinRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolvePlaceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1923,7 +1989,7 @@
         "tags": [
           "Geocoding"
         ],
-        "summary": "Coordinate → coarse label + structured address (cached; coordinates quantized to a ~100 m grid).",
+        "summary": "Coordinate → label + structured address (cached). precision=Area (default) shares one answer per ~100 m cell; precision=Building per ~11 m cell at building zoom.",
         "operationId": "ReverseGeocode",
         "parameters": [
           {
@@ -1942,6 +2008,13 @@
             "schema": {
               "type": "number",
               "format": "double"
+            }
+          },
+          {
+            "name": "precision",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/ReversePrecision"
             }
           }
         ],
@@ -1999,15 +2072,65 @@
         "tags": [
           "Geocoding"
         ],
-        "summary": "Text → candidate coordinates + structured address (cached).",
+        "summary": "Address/place → candidate coordinates + structured address. Pass q (free text) or structured fields (street with optional house number, postcode, locality, countryCode; street, or postcode+locality, required). intent=Search (default) resolves via the canonical geocoder (cached) with address autocomplete as a second source; intent=Typeahead asks the address autocomplete only, uncached, biased toward nearLat/nearLon. limit 1–20 (default 5).",
         "operationId": "ForwardGeocode",
         "parameters": [
           {
             "name": "q",
             "in": "query",
-            "required": true,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "street",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "postcode",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "locality",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "countryCode",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "intent",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/GeocodeIntent"
+            }
+          },
+          {
+            "name": "nearLat",
+            "in": "query",
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          {
+            "name": "nearLon",
+            "in": "query",
+            "schema": {
+              "type": "number",
+              "format": "double"
             }
           },
           {
@@ -2029,6 +2152,16 @@
                   "items": {
                     "$ref": "#/components/schemas/GeocodeResultDto"
                   }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -2586,17 +2719,14 @@
       },
       "CreatePlaceFromGeocodeRequest": {
         "required": [
-          "query",
           "osmType",
           "osmId"
         ],
         "type": "object",
         "properties": {
-          "query": {
-            "type": "string"
-          },
           "osmType": {
-            "type": "string"
+            "type": "string",
+            "description": "`node`/`way`/`relation`, or `N`/`W`/`R`."
           },
           "osmId": {
             "type": "integer",
@@ -2607,10 +2737,96 @@
               "null",
               "string"
             ],
-            "description": "Canonical name override; defaults to the normalized query text."
+            "description": "Canonical name override; defaults to the hit's name or \"Street HouseNumber, Locality\"."
+          },
+          "query": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The search text the hit came from, when it was a cached search."
+          },
+          "latitude": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "longitude": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "street": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "houseNumber": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "postcode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "locality": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "countryCode": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
-        "description": "Create/dedupe a place from one specific forward-geocode hit the user picked, identified by OSM identity.\n            The hit must be among the (cached) geocode results for string CreatePlaceFromGeocodeRequest.Query — the preview call froze them, so this\n            costs no extra geocoder round trip."
+        "description": "Create/dedupe a place from one geocode hit the user picked, identified by OSM identity. Resolved from the\n            frozen results of string? CreatePlaceFromGeocodeRequest.Query when given, else by an OSM lookup; when the lookup misses, the hit's own\n            coordinates and address components (as shown to the user) create an approximate place."
+      },
+      "CreatePlaceFromPinRequest": {
+        "required": [
+          "latitude",
+          "longitude"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Defaults to the address at the pin (\"Street HouseNumber, Locality\"), else its coordinates."
+          },
+          "latitude": {
+            "type": "number",
+            "format": "double"
+          },
+          "longitude": {
+            "type": "number",
+            "format": "double"
+          },
+          "category": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PlaceCategory"
+              }
+            ]
+          }
+        },
+        "description": "Create (or match within 25 m) a place at a dropped pin. The location is the pin itself."
       },
       "CreatePlaceRequest": {
         "required": [
@@ -2800,12 +3016,20 @@
         ],
         "description": "External identity system a PlaceExternalId reconciles against."
       },
+      "GeocodeIntent": {
+        "enum": [
+          "Search",
+          "Typeahead",
+          null
+        ]
+      },
       "GeocodeResultDto": {
         "required": [
           "displayName",
           "latitude",
           "longitude",
-          "category"
+          "category",
+          "isArea"
         ],
         "type": "object",
         "properties": {
@@ -2847,6 +3071,28 @@
               "string"
             ]
           },
+          "street": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "houseNumber": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "postcode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isArea": {
+            "type": "boolean",
+            "description": "A settlement or administrative area rather than a venue or address."
+          },
           "osmType": {
             "type": [
               "null",
@@ -2862,7 +3108,7 @@
             "format": "int64"
           }
         },
-        "description": "A geocoding hit — a coordinate + display label + best-effort structured address and category. Coarse by\n            design (coordinates are quantized to the cache grid)."
+        "description": "A geocoding hit — a coordinate + display label + best-effort structured address and category."
       },
       "LookupPlacesRequest": {
         "required": [
@@ -3193,9 +3439,10 @@
           "Matched",
           "Geocoded",
           "Provisional",
-          "GeocodeUnavailable"
+          "GeocodeUnavailable",
+          "Created"
         ],
-        "description": "How Place resolution landed: an existing entry matched, a fresh geocode created one, a\n            coordinate-less provisional stub was created (address not found), or the geocoder was unreachable so nothing was\n            created — the last is retryable and must NOT be mistaken for \"not found\"."
+        "description": "How Place resolution landed: an existing entry matched, a fresh geocode created one, a\n            coordinate-less provisional stub was created (address not found), the geocoder was unreachable so nothing was\n            created — retryable and must NOT be mistaken for \"not found\" — or a dropped pin created one."
       },
       "PlaceSource": {
         "enum": [
@@ -3476,6 +3723,13 @@
           }
         },
         "description": "Bulk ResolvePlaceRequest — for imports. Responses align index-for-index with the input."
+      },
+      "ReversePrecision": {
+        "enum": [
+          "Area",
+          "Building",
+          null
+        ]
       },
       "SavedPlaceDto": {
         "required": [

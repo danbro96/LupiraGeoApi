@@ -48,6 +48,10 @@ builder.Services.AddHttpClient<IContactPlaceReferences, ContactApiClient>().AddL
 builder.Services.Configure<CalendarApiOptions>(builder.Configuration.GetSection(CalendarApiOptions.SectionName));
 builder.Services.AddHttpClient<ICalendarPlaceReferences, CalendarApiClient>().AddLupiraServiceToken<CalendarApiOptions>();
 
+// Address autocomplete for typeahead; unset Photon:BaseUrl keeps typeahead on the regional geocoder.
+builder.Services.Configure<PhotonOptions>(builder.Configuration.GetSection(PhotonOptions.SectionName));
+builder.Services.AddHttpClient<IAddressAutocomplete, PhotonAddressAutocomplete>(c => c.Timeout = TimeSpan.FromSeconds(3));
+
 // Self-hosted MapLibre basemap (style + pmtiles + glyphs/sprites); serves nothing until Basemap:AssetsPath is set.
 builder.Services.Configure<BasemapOptions>(builder.Configuration.GetSection(BasemapOptions.SectionName));
 

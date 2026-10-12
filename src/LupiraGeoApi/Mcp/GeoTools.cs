@@ -47,10 +47,10 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
     [Description("Resolve a coordinate to a coarse place label + structured address.")]
     public async Task<GeocodeResultDto?> ReverseGeocode(
         [Description("Latitude.")] double lat, [Description("Longitude.")] double lon, CancellationToken ct = default) =>
-        (await geocoder.ReverseAsync(lat, lon, ct))?.ToDto();
+        (await geocoder.ReverseAsync(lat, lon, ct: ct))?.ToDto();
 
     [McpServerTool(Name = "forward_geocode")]
-    [Description("Resolve free text (address/place) to candidate coordinates + structured address. Does NOT persist a place — use for private homes you want to keep out of the shared gazetteer (feed the coordinate to save_place). Returns an empty list on both a genuine no-hit and a transient geocoder outage; retry an empty result before treating it as 'not found'.")]
+    [Description("Resolve free text (address/place) to candidate coordinates + structured address. Does NOT persist a place. Returns an empty list on both a genuine no-hit and a transient geocoder outage; retry an empty result before treating it as 'not found'.")]
     public async Task<List<GeocodeResultDto>> ForwardGeocode(
         [Description("Text to geocode (e.g. a street address).")] string q,
         [Description("Max candidates (default 5).")] int? limit = null,
@@ -275,11 +275,11 @@ public sealed class GeoTools(CurrentUser user, PlaceQueryService places, Geocodi
     }
 
     [McpServerTool(Name = "save_place")]
-    [Description("Save a personal label (private, owner-scoped) over a gazetteer place id, or over a raw coordinate. This is where 'Home', 'Work', family homes live — not the shared catalog.")]
+    [Description("Save a personal label (private, owner-scoped) over a gazetteer place id, or over a raw coordinate. The label ('Home', 'Work') is personal; the address itself is a catalog place — resolve it first and label its id.")]
     public async Task<SavedPlaceDto> SavePlace(
         [Description("Personal label, e.g. 'Home' or 'Mormor & morfar'.")] string label,
         [Description("Gazetteer place id to label (optional if lat/lon given).")] Guid? placeId = null,
-        [Description("Raw latitude (optional; use for a private home kept out of the gazetteer).")] double? latitude = null,
+        [Description("Raw latitude (optional; for a spot with no catalog place).")] double? latitude = null,
         [Description("Raw longitude (optional).")] double? longitude = null,
         [Description("Free-text note (optional), e.g. 'longest childhood home'.")] string? notes = null,
         [Description("Mark as favorite (default false).")] bool isFavorite = false,

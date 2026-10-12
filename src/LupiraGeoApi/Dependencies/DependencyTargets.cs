@@ -5,7 +5,7 @@ using Microsoft.Extensions.Options;
 namespace LupiraGeoApi.Dependencies;
 
 /// <summary>Roster derived from the same options the geocoder binds — edges cannot drift. Both
-/// Nominatim URLs unset is a supported mode (cache-only geocoding), reported as Unconfigured.</summary>
+/// Nominatim URLs unset is a supported mode (cache-only geocoding), reported as Unconfigured; so is an unset Photon.</summary>
 public static class DependencyTargets
 {
     public static IReadOnlyList<DependencyTarget> From(IOptions<NominatimOptions> nominatim, IConfiguration config)
@@ -28,6 +28,12 @@ public static class DependencyTargets
                 BaseUrl = opts.FallbackBaseUrl ?? string.Empty,
                 ProbePath = "search?format=jsonv2&limit=1&q=a",
                 Credential = userAgent,
+            },
+            new DependencyTarget
+            {
+                Name = "photon-api",
+                BaseUrl = config["Photon:BaseUrl"] ?? string.Empty,
+                ProbePath = "api?q=a&limit=1",
             },
             new DependencyTarget
             {

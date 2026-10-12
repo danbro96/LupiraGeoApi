@@ -38,17 +38,19 @@ public sealed class GeocodingService(
 
     private static string? Normalize(string? url) => url is { Length: > 0 } ? url.TrimEnd('/') : null;
 
-    public async Task<GeocodeHit?> ReverseAsync(double lat, double lon, CancellationToken ct = default)
+    public async Task<GeocodeHit?> ReverseAsync(
+        double lat, double lon, ReversePrecision precision = ReversePrecision.Area, CancellationToken ct = default)
     {
-        var id = GeocodeCache.ReverseId(lat, lon);
+        var fine = precision == ReversePrecision.Building;
+        var id = fine ? GeocodeCache.FineReverseId(lat, lon) : GeocodeCache.ReverseId(lat, lon);
         if (await session.LoadAsync<GeocodeCache>(id, ct) is { } cached)
         {
             using var cdoc = JsonDocument.Parse(cached.Payload);
             return ParseHit(cdoc.RootElement);
         }
 
-        var (qlat, qlon) = GeocodeCache.Quantize(lat, lon);
-        var pathQuery = $"/reverse?format=jsonv2&addressdetails=1&lat={Fmt(qlat)}&lon={Fmt(qlon)}";
+        var (qlat, qlon) = fine ? GeocodeCache.QuantizeFine(lat, lon) : GeocodeCache.Quantize(lat, lon);
+        var pathQuery = $"/reverse?format=jsonv2&addressdetails=1&lat={Fmt(qlat)}&lon={Fmt(qlon)}{(fine ? "&zoom=18" : string.Empty)}";
         JsonDocument? coarse = null;
         try
         {
@@ -94,19 +96,22 @@ public sealed class GeocodingService(
         }
     }
 
+    public Task<ForwardResult> ForwardAsync(
+        string query, int limit = 5, ForwardCacheMode cacheMode = ForwardCacheMode.Default, CancellationToken ct = default) =>
+        string.IsNullOrWhiteSpace(query)
+            ? Task.FromResult(ForwardResult.Empty)
+            : ForwardAsync(AddressQuery.FromText(query), limit, cacheMode, ct);
+
     /// <summary>An <see cref="GeocodeStatus.Unavailable"/> outcome writes nothing, so an outage can't destroy a
     /// previously frozen answer in any <paramref name="cacheMode"/>.</summary>
     public async Task<ForwardResult> ForwardAsync(
-        string query, int limit = 5, ForwardCacheMode cacheMode = ForwardCacheMode.Default, CancellationToken ct = default)
+        AddressQuery query, int limit = 5, ForwardCacheMode cacheMode = ForwardCacheMode.Default, CancellationToken ct = default)
     {
-        query = query.Trim();
-        if (query.Length == 0) return ForwardResult.Empty;
-
         var regional = RegionalCountries();
         List<GeocodeHit> Accepted(JsonElement root) =>
             ParseArray(root).Where(h => ForwardHitFilter.Accepts(query, h, regional)).Take(limit).ToList();
 
-        var id = GeocodeCache.ForwardId(query);
+        var id = query.CacheId;
         if (cacheMode != ForwardCacheMode.Bypass && await session.LoadAsync<GeocodeCache>(id, ct) is { } cached)
         {
             using var cdoc = JsonDocument.Parse(cached.Payload);
@@ -118,7 +123,7 @@ public sealed class GeocodingService(
                 return ForwardResult.FromHits(cachedHits);
         }
 
-        var pathQuery = $"/search?format=jsonv2&addressdetails=1&limit={Math.Max(limit, CandidatePool)}&q={Uri.EscapeDataString(query)}";
+        var pathQuery = SearchPath(query, Math.Max(limit, CandidatePool));
         JsonDocument? emptyResult = null;
         var anyFailure = false;
         try
@@ -135,7 +140,7 @@ public sealed class GeocodingService(
                 var hits = Accepted(fetch.RootElement);
                 if (hits.Count > 0)
                 {
-                    await CacheAsync(id, "forward", query, fetch.RootElement, ct);
+                    await CacheAsync(id, "forward", query.CacheKey, fetch.RootElement, ct);
                     fetch.Dispose();
                     return ForwardResult.FromHits(hits);
                 }
@@ -148,7 +153,7 @@ public sealed class GeocodingService(
             // all, so a transient outage never gets frozen as a no-hit or turned into a coordinate-less stub.
             if (emptyResult is not null)
             {
-                await CacheAsync(id, "forward", query, emptyResult.RootElement, ct);
+                await CacheAsync(id, "forward", query.CacheKey, emptyResult.RootElement, ct);
                 return ForwardResult.Empty;
             }
 
@@ -158,6 +163,58 @@ public sealed class GeocodingService(
         {
             emptyResult?.Dispose();
         }
+    }
+
+    /// <summary>The regional instance alone, uncached and without the bare-word bar: typeahead input is partial by
+    /// nature, and the public endpoint's usage policy forbids autocomplete traffic.</summary>
+    public async Task<ForwardResult> ForwardRegionalAsync(AddressQuery query, int limit, CancellationToken ct = default)
+    {
+        if (PrimaryUrl is not { } baseUrl) return ForwardResult.Empty;
+        using var doc = await GetAsync(PrimaryClientName, baseUrl + SearchPath(query, limit), ct);
+        if (doc is null) return ForwardResult.Unavailable;
+        var hits = ParseArray(doc.RootElement).Where(h => ForwardHitFilter.MatchesPostcode(query, h)).Take(limit).ToList();
+        return hits.Count > 0 ? ForwardResult.FromHits(hits) : ForwardResult.Empty;
+    }
+
+    /// <summary>Hits frozen for a text query, without asking any endpoint.</summary>
+    public async Task<IReadOnlyList<GeocodeHit>> FrozenForwardHitsAsync(string query, CancellationToken ct = default) =>
+        string.IsNullOrWhiteSpace(query) || await session.LoadAsync<GeocodeCache>(GeocodeCache.ForwardId(query), ct) is not { } cached
+            ? []
+            : ParseCached(cached.Payload);
+
+    /// <summary>One OSM object by identity (<c>/lookup</c>), regional first, then the public fallback. Hits are frozen
+    /// under <c>osm:W123</c>; a miss is not, so an object OSM gains later is found on retry.</summary>
+    public async Task<ForwardResult> LookupAsync(char osmLetter, long osmId, CancellationToken ct = default)
+    {
+        var osmKey = $"{osmLetter}{osmId.ToString(CultureInfo.InvariantCulture)}";
+        var id = GeocodeCache.LookupId(osmKey);
+        if (await session.LoadAsync<GeocodeCache>(id, ct) is { } cached && ParseCached(cached.Payload) is { Count: > 0 } frozen)
+            return ForwardResult.FromHits(frozen);
+
+        var anyAnswer = false;
+        foreach (var (client, baseUrl) in Endpoints())
+        {
+            using var doc = await GetAsync(client, $"{baseUrl}/lookup?format=jsonv2&addressdetails=1&osm_ids={osmKey}", ct);
+            if (doc is null) continue;
+            anyAnswer = true;
+            var hits = ParseArray(doc.RootElement).Where(h => h.OsmId == osmId).ToList();
+            if (hits.Count == 0) continue;
+            await CacheAsync(id, "lookup", $"osm:{osmKey}", doc.RootElement, ct);
+            return ForwardResult.FromHits(hits);
+        }
+
+        return anyAnswer || !Endpoints().Any() ? ForwardResult.Empty : ForwardResult.Unavailable;
+    }
+
+    private static string SearchPath(AddressQuery query, int limit)
+    {
+        var path = $"/search?format=jsonv2&addressdetails=1&limit={limit}";
+        if (query.Text is { } text) return path + "&q=" + Uri.EscapeDataString(text);
+        if (query.Street is { } street) path += "&street=" + Uri.EscapeDataString(street);
+        if (query.Locality is { } locality) path += "&city=" + Uri.EscapeDataString(locality);
+        if (query.Postcode is { } postcode) path += "&postalcode=" + Uri.EscapeDataString(postcode);
+        if (query.CountryCode is { } cc) path += "&countrycodes=" + cc.ToLowerInvariant();
+        return path;
     }
 
     private HashSet<string> RegionalCountries() =>
@@ -260,7 +317,7 @@ public sealed class GeocodingService(
         if (!TryDouble(el, "lat", out var lat) || !TryDouble(el, "lon", out var lon)) return null;
         var display = Str(el, "display_name") ?? Str(el, "name") ?? string.Empty;
 
-        string? cc = null, country = null, region = null, locality = null, postcode = null, houseNumber = null;
+        string? cc = null, country = null, region = null, locality = null, postcode = null, houseNumber = null, street = null;
         if (el.TryGetProperty("address", out var a) && a.ValueKind == JsonValueKind.Object)
         {
             cc = Str(a, "country_code")?.ToUpperInvariant();
@@ -269,11 +326,12 @@ public sealed class GeocodingService(
             locality = Str(a, "city") ?? Str(a, "town") ?? Str(a, "village") ?? Str(a, "municipality");
             postcode = Str(a, "postcode");
             houseNumber = Str(a, "house_number");
+            street = Str(a, "road") ?? Str(a, "pedestrian");
         }
 
         var type = Str(el, "type");
         var osmClass = Str(el, "category") ?? Str(el, "class");
-        var category = MapCategory(type, osmClass);
+        var category = OsmCategory.Map(type, osmClass);
         var osmType = Str(el, "osm_type");
         long? osmId = el.TryGetProperty("osm_id", out var o) && o.TryGetInt64(out var v) ? v : null;
         var addressType = Str(el, "addresstype");
@@ -282,39 +340,8 @@ public sealed class GeocodingService(
         double? importance = TryDouble(el, "importance", out var imp) ? imp : null;
         return new GeocodeHit(
             display, lat, lon, category, cc, country, region, locality, osmType, osmId, isArea, postcode, importance,
-            houseNumber, isCoarse);
+            houseNumber, isCoarse, street, Str(el, "name") is { Length: > 0 } name ? name : null);
     }
-
-    /// <summary>Best-effort Nominatim OSM type/class → coarse <see cref="PlaceCategory"/>.</summary>
-    private static PlaceCategory MapCategory(string? type, string? klass) => type switch
-    {
-        "restaurant" or "fast_food" => PlaceCategory.Restaurant,
-        "cafe" => PlaceCategory.Cafe,
-        "bar" or "pub" or "nightclub" => PlaceCategory.Bar,
-        "supermarket" or "convenience" or "grocery" => PlaceCategory.Grocery,
-        "school" or "kindergarten" or "college" => PlaceCategory.School,
-        "university" => PlaceCategory.University,
-        "hospital" => PlaceCategory.Hospital,
-        "clinic" or "doctors" or "dentist" => PlaceCategory.Clinic,
-        "pharmacy" => PlaceCategory.Pharmacy,
-        "gym" or "fitness_centre" or "sports_centre" => PlaceCategory.Gym,
-        "park" or "garden" => PlaceCategory.Park,
-        "aerodrome" or "airport" => PlaceCategory.Airport,
-        "station" or "halt" or "subway_entrance" => PlaceCategory.Station,
-        "bus_stop" => PlaceCategory.BusStop,
-        "hotel" or "hostel" or "guest_house" => PlaceCategory.Hotel,
-        "hotel " => PlaceCategory.Hotel,
-        "attraction" or "monument" or "memorial" or "artwork" => PlaceCategory.Landmark,
-        "townhall" or "government" => PlaceCategory.Government,
-        "place_of_worship" => PlaceCategory.Worship,
-        _ => klass switch
-        {
-            "shop" => PlaceCategory.Store,
-            "tourism" => PlaceCategory.Landmark,
-            "office" => PlaceCategory.Office,
-            _ => PlaceCategory.Unknown,
-        },
-    };
 
     private static readonly string[] SubCountryFields =
         ["road", "neighbourhood", "hamlet", "quarter", "suburb", "city_district", "city", "town", "village",

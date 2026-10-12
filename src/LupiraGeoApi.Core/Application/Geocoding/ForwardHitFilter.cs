@@ -10,14 +10,22 @@ public static partial class ForwardHitFilter
     internal const double RegionalMinImportance = 0.2;
     internal const double ForeignMinImportance = 0.5;
 
-    public static bool Accepts(string query, GeocodeHit hit, IReadOnlySet<string> regionalCountries)
+    public static bool Accepts(string query, GeocodeHit hit, IReadOnlySet<string> regionalCountries) =>
+        Accepts(AddressQuery.FromText(query), hit, regionalCountries);
+
+    public static bool Accepts(AddressQuery query, GeocodeHit hit, IReadOnlySet<string> regionalCountries)
     {
-        // Postal region only — OSM often files a village under a neighbouring full code.
-        if (Postcode(query) is { } wanted && Digits(hit.Postcode) is { Length: >= 2 } got && wanted[..2] != got[..2])
-            return false;
-        if (!BareWord().IsMatch(query.Trim())) return true;
+        if (!MatchesPostcode(query, hit)) return false;
+        if (query.Text is not { } text || !BareWord().IsMatch(text)) return true;
         var bar = hit.CountryCode is { } cc && regionalCountries.Contains(cc) ? RegionalMinImportance : ForeignMinImportance;
         return (hit.Importance ?? 0) >= bar;
+    }
+
+    /// <summary>Postal region only — OSM often files a village under a neighbouring full code.</summary>
+    public static bool MatchesPostcode(AddressQuery query, GeocodeHit hit)
+    {
+        var wanted = query.Postcode is { } p ? Digits(p) : query.Text is { } t ? Postcode(t) : null;
+        return wanted is not { Length: >= 2 } || Digits(hit.Postcode) is not { Length: >= 2 } got || wanted[..2] == got[..2];
     }
 
     private static string? Postcode(string query) =>

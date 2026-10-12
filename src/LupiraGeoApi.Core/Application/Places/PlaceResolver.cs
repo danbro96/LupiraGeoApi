@@ -44,7 +44,7 @@ public sealed class PlaceResolver(GeoDbContext db, GeocodingService geocoder, Ad
         if (result.Status == GeocodeStatus.Unavailable) return new ResolveOutcome(null, PlaceResolution.GeocodeUnavailable);
 
         if (result.Hits.FirstOrDefault() is { } hit)
-            return await ResolveFromHitAsync(name, hit, createdBy, ct);
+            return await ResolveFromHitAsync(name, hit, approximateFix: false, createdBy, ct);
 
         // (3) Definitive no-hit → provisional user place with no coordinates yet.
         var provisional = new Place
@@ -68,12 +68,14 @@ public sealed class PlaceResolver(GeoDbContext db, GeocodingService geocoder, Ad
     /// <summary>Land one specific geocode hit as a place: dedupe by OSM identity, then by name+proximity, else create
     /// a <see cref="PlaceSource.Geocoded"/> place with coordinates and containment. Shared by text resolve (first hit)
     /// and create-from-geocode (user-picked hit). A hit missing the requested house number lands with its coordinates
-    /// only: its OSM id and address name the street, which every number on it shares.</summary>
-    internal async Task<ResolveOutcome> ResolveFromHitAsync(string name, GeocodeHit hit, Guid? createdBy, CancellationToken ct)
+    /// only: its OSM id and address name the street, which every number on it shares. <paramref name="approximateFix"/>
+    /// forces that treatment for a hit not confirmed by the geocoder.</summary>
+    internal async Task<ResolveOutcome> ResolveFromHitAsync(
+        string name, GeocodeHit hit, bool approximateFix, Guid? createdBy, CancellationToken ct)
     {
         var point = new Point(hit.Lon, hit.Lat) { SRID = 4326 };
         var key = PlaceTextNormalizer.Key(name);
-        var approximate = HouseNumber.IsApproximateFix(name, hit);
+        var approximate = approximateFix || HouseNumber.IsApproximateFix(name, hit);
         var osmId = !approximate && hit is { OsmType: { } t, OsmId: { } oid } ? $"{t}/{oid}" : null;
 
         // Dedup by OSM identity first: one real-world object resolves here under many text forms (a bare name
@@ -91,15 +93,7 @@ public sealed class PlaceResolver(GeoDbContext db, GeocodingService geocoder, Ad
             }
         }
 
-        // Similarity, not equality: "Bara enkelt" and "Bara enkelt, Skånegatan 59" are one venue. word_similarity is
-        // asymmetric (it scores the best extent of the second argument), so try both directions.
-        var near = await db.Places
-            .Where(p => p.MergedIntoId == null && p.DeletedAt == null && p.Location != null
-                && p.Location.Distance(point) <= DedupeMeters
-                && (p.NormalizedName == key
-                    || EF.Functions.TrigramsWordSimilarity(key, p.NormalizedName) >= DedupeSimilarity
-                    || EF.Functions.TrigramsWordSimilarity(p.NormalizedName, key) >= DedupeSimilarity))
-            .ToListAsync(ct);
+        var near = await FindNearAsync(point, key, DedupeMeters, ct);
         if (near.FirstOrDefault(p => SameAddress(name, approximate, p, hit)) is { } match)
             return new ResolveOutcome(match, PlaceResolution.Matched);
 
@@ -127,6 +121,18 @@ public sealed class PlaceResolver(GeoDbContext db, GeocodingService geocoder, Ad
         await db.SaveChangesAsync(ct);
         return new ResolveOutcome(place, PlaceResolution.Geocoded);
     }
+
+    /// <summary>Live places within <paramref name="meters"/> whose name matches <paramref name="key"/> closely. Similarity,
+    /// not equality: "Bara enkelt" and "Bara enkelt, Skånegatan 59" are one venue. word_similarity is asymmetric (it
+    /// scores the best extent of the second argument), so both directions are tried.</summary>
+    internal Task<List<Place>> FindNearAsync(Point point, string key, double meters, CancellationToken ct) =>
+        db.Places
+            .Where(p => p.MergedIntoId == null && p.DeletedAt == null && p.Location != null
+                && p.Location.Distance(point) <= meters
+                && (p.NormalizedName == key
+                    || EF.Functions.TrigramsWordSimilarity(key, p.NormalizedName) >= DedupeSimilarity
+                    || EF.Functions.TrigramsWordSimilarity(p.NormalizedName, key) >= DedupeSimilarity))
+            .ToListAsync(ct);
 
     /// <summary>Under an approximate fix only the same house number identifies the place; otherwise a numbered
     /// candidate must neither contradict the request nor be coarser than the hit.</summary>

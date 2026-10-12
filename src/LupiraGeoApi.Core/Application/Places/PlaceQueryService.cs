@@ -524,45 +524,6 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
         return OpResult<List<CurationEventDto>>.Ok(events);
     }
 
-    /// <summary>Create/dedupe a place from one specific geocode hit picked by OSM identity. Serves the SPA's
-    /// commit path after a forward-geocode preview: the hits are already frozen in the cache, so this re-reads
-    /// them and funnels into the resolver's dedupe — zero extra geocoder calls.</summary>
-    public async Task<OpResult<ResolvePlaceResponse>> CreateFromGeocodeAsync(
-        CreatePlaceFromGeocodeRequest r, Guid createdBy, CancellationToken ct = default)
-    {
-        if (string.IsNullOrWhiteSpace(r.Query)) return OpResult<ResolvePlaceResponse>.Invalid("Query is required.");
-        if (string.IsNullOrWhiteSpace(r.OsmType)) return OpResult<ResolvePlaceResponse>.Invalid("OsmType is required.");
-
-        var result = await geocoder.ForwardAsync(r.Query, limit: 5, ct: ct);
-        if (result.Status == GeocodeStatus.Unavailable)
-            return OpResult<ResolvePlaceResponse>.Invalid("Geocoder unavailable; retry.");
-        var hit = result.Hits.FirstOrDefault(h =>
-            h.OsmId == r.OsmId && string.Equals(h.OsmType, r.OsmType, StringComparison.OrdinalIgnoreCase));
-        if (hit is null)
-            return OpResult<ResolvePlaceResponse>.Invalid("That result is not among the geocode hits for this query.");
-
-        var name = PlaceTextNormalizer.Canonical(r.Name ?? r.Query);
-        ResolveOutcome outcome;
-        try
-        {
-            outcome = await resolver.ResolveFromHitAsync(name, hit, createdBy, ct);
-        }
-        catch (DbUpdateException ex)
-        {
-            logger.LogError(ex, "Creating a place from geocode hit {OsmType}/{OsmId} failed to persist.", r.OsmType, r.OsmId);
-            return OpResult<ResolvePlaceResponse>.Conflict("Could not persist the place; a conflicting gazetteer entry may already exist.");
-        }
-
-        return OpResult<ResolvePlaceResponse>.Ok(new ResolvePlaceResponse
-        {
-            Resolution = outcome.Resolution,
-            PlaceId = outcome.Place?.Id,
-            Name = outcome.Place?.CanonicalName ?? name,
-            Latitude = outcome.Place?.Location?.Y,
-            Longitude = outcome.Place?.Location?.X,
-        });
-    }
-
     /// <summary>Bulk resolve; responses align index-for-index with the input. All-or-nothing on invalid items.</summary>
     public async Task<OpResult<List<ResolvePlaceResponse>>> ResolveBatchAsync(
         List<string> texts, Guid createdBy, CancellationToken ct = default)

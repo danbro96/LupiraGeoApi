@@ -113,8 +113,13 @@ public static class PlacesEndpoints
 
         group.MapPost("/from-geocode", (CreatePlaceFromGeocodeRequest r, PlacesHandler h, CancellationToken ct) => h.CreateFromGeocodeAsync(r, ct))
             .WithName("CreatePlaceFromGeocode")
-            .WithSummary("Create/dedupe a place from one specific forward-geocode hit the user picked (query + OSM identity). Reuses the frozen geocode cache — no extra geocoder call. 400 if the hit is not among the query's geocode results.")
+            .WithSummary("Create/dedupe a place from one geocode hit the user picked (OSM identity). Resolved from the query's frozen results when query is given, else by OSM lookup; when the lookup misses, the hit's coordinates and address fields create an approximate place (no OSM id). Name defaults to the hit's name or \"Street HouseNumber, Locality\". 400 when the hit cannot be resolved and no coordinates were passed.")
             .Produces<ResolvePlaceResponse>(StatusCodes.Status200OK).ProducesProblem(StatusCodes.Status400BadRequest).ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapPost("/from-pin", (CreatePlaceFromPinRequest r, PlacesHandler h, CancellationToken ct) => h.CreateFromPinAsync(r, ct))
+            .WithName("CreatePlaceFromPin")
+            .WithSummary("Create a place at a dropped pin (exact coordinates), or match one within 25 m with a similar name (resolution Matched/Created). Address and containment come from a building-precision reverse geocode; name defaults to \"Street HouseNumber, Locality\" at the pin, else its coordinates. Created even when the geocoder is down.")
+            .Produces<ResolvePlaceResponse>(StatusCodes.Status200OK).ProducesProblem(StatusCodes.Status400BadRequest);
 
         return app;
     }

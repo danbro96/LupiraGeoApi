@@ -7,7 +7,8 @@ using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace LupiraGeoApi.Handlers;
 
-public sealed class PlacesHandler(PlaceQueryService places, PlaceMergeService merges, PlaceDuplicateService duplicates, CurrentUser user)
+public sealed class PlacesHandler(
+    PlaceQueryService places, PlaceCaptureService capture, PlaceMergeService merges, PlaceDuplicateService duplicates, CurrentUser user)
 {
     public async Task<Results<Ok<List<DuplicateClusterDto>>, ProblemHttpResult, UnauthorizedHttpResult>> DuplicatesAsync(
         double? radiusM, double? minSimilarity, int? limit, CancellationToken ct) =>
@@ -117,7 +118,14 @@ public sealed class PlacesHandler(PlaceQueryService places, PlaceMergeService me
         CreatePlaceFromGeocodeRequest r, CancellationToken ct)
     {
         var u = await user.GetAsync(ct);
-        return OpResultMap.OkProblem(await places.CreateFromGeocodeAsync(r, u.Id, ct));
+        return OpResultMap.OkProblem(await capture.CreateFromGeocodeAsync(r, u.Id, ct));
+    }
+
+    public async Task<Results<Ok<ResolvePlaceResponse>, ProblemHttpResult, UnauthorizedHttpResult>> CreateFromPinAsync(
+        CreatePlaceFromPinRequest r, CancellationToken ct)
+    {
+        var u = await user.GetAsync(ct);
+        return OpResultMap.OkProblem(await capture.CreateFromPinAsync(r, u.Id, ct));
     }
 
     public async Task<Results<Ok<List<CurationEventDto>>, NotFound, ProblemHttpResult, UnauthorizedHttpResult>> HistoryAsync(Guid id, CancellationToken ct) =>

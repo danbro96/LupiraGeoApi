@@ -60,6 +60,10 @@ public static class GeoMappers
         Country = h.Country,
         Region = h.Region,
         Locality = h.Locality,
+        Street = h.Street,
+        HouseNumber = h.HouseNumber,
+        Postcode = h.Postcode,
+        IsArea = h.IsArea,
         OsmType = h.OsmType,
         OsmId = h.OsmId,
     };

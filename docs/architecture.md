@@ -19,7 +19,7 @@ Two projects, split on the architectural boundary (same shape as the other Lupir
 HTTP ─▶ Endpoints/ ─▶ Handlers/ ─▶ Core: Application services ─▶ Marten (geo_user) + EF Core/PostGIS (geo)
   │                       │                     │
   └─ MCP ─▶ Mcp/GeoTools ─┘                  OpResult ──▶ OpResultMap (RFC 7807) on the way back
-                       CurrentUser                        Nominatim (geocoding) · GeoNames (seed)
+                       CurrentUser            Nominatim (geocoding) · Photon (address autocomplete) · GeoNames (seed)
 ```
 
 ## Two storage models, one database
@@ -117,9 +117,44 @@ to 50 texts, responses aligned index-for-index.
 
 ## Typeahead
 
-`GET /places/suggest` is the UI typeahead: trigram `word_similarity` (pg_trgm GIN indexes exist on place names,
+`GET /places/suggest` is the catalog typeahead: trigram `word_similarity` (pg_trgm GIN indexes exist on place names,
 aliases, and area names) over places **and** `AdminArea` localities, merged and ranked, discriminated by a
 `type` field — cities suggest straight from the GeoNames seed without a gazetteer entry.
+
+## Address search
+
+`GET /geocode/forward` takes free text (`q`) or structured fields (`street` with an optional house number, `postcode`,
+`locality`, `countryCode`; `street`, or `postcode` + `locality`, required), plus an `intent`. `ForwardRouting` picks
+the backends, first with hits answers (`AddressSearchService`):
+
+| Intent | Backends | Cache |
+|---|---|---|
+| `Search` (default) | Nominatim (regional → public), then address autocomplete | Nominatim answers frozen |
+| `Typeahead` | address autocomplete; unconfigured ⇒ regional Nominatim only | never |
+
+Address autocomplete (`IAddressAutocomplete`) is self-hosted Photon (`Photon:BaseUrl`, Europe extract), adapted in the
+host (`PhotonAddressAutocomplete`) to `GeocodeHit`. It is search-as-you-type only: Nominatim stays the canonical
+resolver, typeahead never reaches the public Nominatim (its usage policy forbids autocomplete), and suggestions are
+never frozen. `nearLat`/`nearLon` bias autocomplete ranking. Hits carry `Street`, `HouseNumber`, `Postcode`, `IsArea`
+and the OSM identity.
+
+## Committing a pick
+
+Addresses are catalog places: a home is a `Place` that residencies (LupiraContactApi) reference by id; the personal
+label ("Home") is a `SavedPlace`.
+
+`POST /places/from-geocode` lands a picked hit by OSM identity: the frozen results of `query` when given, else
+`/lookup` on the regional Nominatim, then the public fallback (one throttled call per commit, frozen under
+`osm:W123`). When neither knows the object, the client's copy of the hit (coordinates + address fields) creates an
+approximate place — no OSM id, no `FormattedAddress`, containment from a reverse geocode (none if that is down; a
+later regeocode heals it). The hit then runs through the resolver's OSM-id → house-number-aware proximity dedupe →
+containment. The default name comes from the hit: a venue or settlement keeps its name, an address is
+"Street HouseNumber, Locality".
+
+`POST /places/from-pin` creates a `User` place at the exact pin. A building-precision reverse geocode supplies
+`FormattedAddress`, containment and the default name ("Street HouseNumber, Locality", else the coordinates). A place
+within 25 m with a similar name matches instead (`Matched`/`Created`); equal names far apart are separate places. A
+geocoder outage still creates the place from its coordinates.
 
 ## Curation: aliases, merge, verify
 
@@ -140,15 +175,16 @@ conventions any future event stream must follow.
 
 ## Geocoding & the cache
 
-`GeocodingService` does forward (`/search`) and reverse (`/reverse`) geocoding, resolve-once-and-freeze into
-`GeocodeCache` — reverse keyed by a ~100 m quantized grid cell, forward by the normalized query, both via a
-deterministic id so retries upsert. Forward hits stay frozen; an empty forward answer expires after a day, and
+`GeocodingService` does forward (`/search`, free text or structured), reverse (`/reverse`) and OSM-identity
+(`/lookup`) geocoding, resolve-once-and-freeze into `GeocodeCache` — reverse keyed by a quantized grid cell (~100 m
+for `precision=Area`, ~11 m at building zoom for `precision=Building`), forward by the normalized query or structured
+fields, lookups by OSM id, all via a deterministic id so retries upsert. Forward hits stay frozen; an empty forward answer expires after a day, and
 regeocode always re-asks it (`force=true` also bypasses frozen hits). Two endpoints, tried in order (`NominatimOptions`): the self-hosted regional
 instance (`Nominatim:BaseUrl`), then an optional public fallback (`Nominatim:FallbackBaseUrl`) for queries outside the
 regional extract's coverage — throttled through `NominatimRateGate` (singleton, ≥1.1 s between requests, per the
 public usage policy) with an identifying `Nominatim:UserAgent`. Whichever endpoint answers is frozen, so a foreign
 query costs one public call ever. Forward hits must pass `ForwardHitFilter` or count as a miss (so the next endpoint is
-asked): a 5-digit postcode in the query must share the hit's first two digits, and a bare one-word query needs
+asked): a postcode (the structured field, else a 5-digit token in the text) must share the hit's first two digits, and a bare one-word query needs
 Nominatim importance ≥ 0.2 inside `Nominatim:RegionalCountries`, ≥ 0.5 elsewhere. Forward fetches 10 candidates so a
 passing hit below a rejected one is still found. Any failure or no configured URL returns empty/null and never blocks a resolve.
 
@@ -172,4 +208,4 @@ in `Lupira.Hosting.Problems` to typed `Results<...>` unions with RFC 7807 proble
 
 ---
 
-Place data © OpenStreetMap contributors (via Nominatim), ODbL. Administrative data © GeoNames, CC BY 4.0.
+Place data © OpenStreetMap contributors (via Nominatim and Photon), ODbL. Administrative data © GeoNames, CC BY 4.0.

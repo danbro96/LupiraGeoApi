@@ -29,4 +29,13 @@ public sealed class GeocodeCacheTests
         Assert.Equal(GeocodeCache.ForwardId("Cafe Central"), GeocodeCache.ForwardId("  cafe central  "));
         Assert.NotEqual(GeocodeCache.ForwardId("Cafe Central"), GeocodeCache.ForwardId("Cafe West"));
     }
+
+    [Fact]
+    public void FineReverseId_resolves_an_11m_grid_apart_from_the_area_grid()
+    {
+        var a = GeocodeCache.FineReverseId(59.32931, 18.06841);
+        Assert.Equal(a, GeocodeCache.FineReverseId(59.32934, 18.06839));
+        Assert.NotEqual(a, GeocodeCache.FineReverseId(59.32951, 18.06841));
+        Assert.NotEqual(GeocodeCache.ReverseId(59.329, 18.068), GeocodeCache.FineReverseId(59.329, 18.068));
+    }
 }

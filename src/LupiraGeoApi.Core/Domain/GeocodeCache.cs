@@ -30,6 +30,27 @@ public sealed class GeocodeCache
         return DeterministicGuid.From($"rev:{qlat.ToString(CultureInfo.InvariantCulture)}:{qlon.ToString(CultureInfo.InvariantCulture)}");
     }
 
+    /// <summary>~11 m grid for building-precision reverse.</summary>
+    public static (double Lat, double Lon) QuantizeFine(double lat, double lon) => (Math.Round(lat, 4), Math.Round(lon, 4));
+
+    public static Guid FineReverseId(double lat, double lon)
+    {
+        var (qlat, qlon) = QuantizeFine(lat, lon);
+        return DeterministicGuid.From($"rev4:{qlat.ToString(CultureInfo.InvariantCulture)}:{qlon.ToString(CultureInfo.InvariantCulture)}");
+    }
+
     public static Guid ForwardId(string query) =>
         DeterministicGuid.From($"fwd:{query.Trim().ToLowerInvariant()}");
+
+    public static Guid StructuredForwardId(string? street, string? postcode, string? locality, string? countryCode) =>
+        DeterministicGuid.From($"fwds:{StructuredKey(street, postcode, locality, countryCode)}");
+
+    public static string StructuredKey(string? street, string? postcode, string? locality, string? countryCode) =>
+        string.Join('|', Part(street), string.Concat((postcode ?? string.Empty).Where(c => !char.IsWhiteSpace(c))).ToLowerInvariant(),
+            Part(locality), Part(countryCode));
+
+    /// <summary>An OSM object lookup, keyed like <c>osm:W123</c>.</summary>
+    public static Guid LookupId(string osmKey) => DeterministicGuid.From($"osm:{osmKey}");
+
+    private static string Part(string? s) => (s ?? string.Empty).Trim().ToLowerInvariant();
 }
