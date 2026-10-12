@@ -25,6 +25,9 @@ public sealed class HouseNumberTests
     [InlineData("Centreumhuset 2 Käppuddsgatan, 824 32 Hudiksvall", "2")]
     [InlineData("55 Liljeörnsgatan, 165 53 Hässelby, SE", "55")]
     [InlineData("5B Storgatan", "5B")]
+    [InlineData("S:a Kungsgatan 24, 972 35 Luleå", "24")]
+    [InlineData("Gustav III:s väg 15", "15")]
+    [InlineData("S:t Eriksgatan 117", "117")]
     public void Finds_the_house_number(string text, string expected) =>
         Assert.Equal(expected, HouseNumber.Find(text));
 
@@ -35,6 +38,7 @@ public sealed class HouseNumberTests
     [InlineData("E4, Södertälje")]
     [InlineData("Storgatan 12345")]
     [InlineData("111 45 Stockholm")]
+    [InlineData("S:t Eriks, Stockholm")]
     public void No_house_number(string text) =>
         Assert.Null(HouseNumber.Find(text));
 
@@ -44,6 +48,7 @@ public sealed class HouseNumberTests
     [InlineData("Storgatan 5 B", "Storgatan 5b, Lund", false)]
     [InlineData("Storgatan 5, lgh 1102", "Storgatan 5", false)]
     [InlineData("Bara enkelt", "Bara enkelt, Skånegatan 59", false)]
+    [InlineData("S:a Kungsgatan 24", "Södra Kungsgatan 26", true)]
     public void Different_numbers_conflict(string a, string b, bool expected) =>
         Assert.Equal(expected, HouseNumber.Conflicts(a, b));
 

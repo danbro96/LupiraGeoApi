@@ -35,7 +35,7 @@ public static partial class HouseNumber
             : string.Concat(number.Where(c => !char.IsWhiteSpace(c))).ToUpperInvariant();
 
     // "Storgatan 5 B" or the number-first export form "5 Storgatan"; a postcode never starts a street.
-    [GeneratedRegex(@"^(?!(?:lgh|lägenhet)\b)(?:(?:\p{L}[\p{L}\p{M}.'-]*\s+)+(?<n>\d{1,4})(?:\s?(?<l>\p{L}))?(?![\p{L}\p{N}])|(?<n>\d{1,4})(?!\d)(?:\s?(?<l>\p{L}))?\s+\p{L}{2,})", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"^(?!(?:lgh|lägenhet)\b)(?:(?:\p{L}[\p{L}\p{M}.:'-]*\s+)+(?<n>\d{1,4})(?:\s?(?<l>\p{L}))?(?![\p{L}\p{N}])|(?<n>\d{1,4})(?!\d)(?:\s?(?<l>\p{L}))?\s+\p{L}{2,})", RegexOptions.IgnoreCase)]
     private static partial Regex StreetSegment();
 
     [GeneratedRegex(@"^\s*(?<n>\d{1,4})\s?(?<l>\p{L})?\s*$")]
