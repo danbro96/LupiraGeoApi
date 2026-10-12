@@ -10,6 +10,7 @@ Docs: `docs/` (architecture, event-sourcing).
 
 ## Geocoding
 - `RegeocodeAsync` geocodes `FormattedAddress` verbatim (`CanonicalName` only when blank). A venue-prefixed address misses; heal with a street-only `FormattedAddress`, then `regeocode_place`, which also builds containment.
+- A numbered address geocoded only to its street (or another number) is an approximate fix: coordinates and containment, no OSM id, no `FormattedAddress`. Dedupe never joins different house numbers (`HouseNumber`).
 - `update_place` lat/lon alone does not build containment; regeocode or pass `withinAreaId`.
 - The regional Nominatim answers bare or foreign names with local lookalikes and ignores postcodes. `ForwardHitFilter` (postcode region check, importance bar for bare words, `Nominatim__RegionalCountries`) rejects those so the next endpoint is asked.
 - `PlaceKind.Area` is a whole settlement or admin area, classified from the geocode cache. `classify_area_places` is dry-run by default; re-run the dry run after bulk imports.

@@ -260,7 +260,7 @@ public sealed class GeocodingService(
         if (!TryDouble(el, "lat", out var lat) || !TryDouble(el, "lon", out var lon)) return null;
         var display = Str(el, "display_name") ?? Str(el, "name") ?? string.Empty;
 
-        string? cc = null, country = null, region = null, locality = null, postcode = null;
+        string? cc = null, country = null, region = null, locality = null, postcode = null, houseNumber = null;
         if (el.TryGetProperty("address", out var a) && a.ValueKind == JsonValueKind.Object)
         {
             cc = Str(a, "country_code")?.ToUpperInvariant();
@@ -268,6 +268,7 @@ public sealed class GeocodingService(
             region = Str(a, "state") ?? Str(a, "region") ?? Str(a, "province");
             locality = Str(a, "city") ?? Str(a, "town") ?? Str(a, "village") ?? Str(a, "municipality");
             postcode = Str(a, "postcode");
+            houseNumber = Str(a, "house_number");
         }
 
         var type = Str(el, "type");
@@ -275,9 +276,13 @@ public sealed class GeocodingService(
         var category = MapCategory(type, osmClass);
         var osmType = Str(el, "osm_type");
         long? osmId = el.TryGetProperty("osm_id", out var o) && o.TryGetInt64(out var v) ? v : null;
-        var isArea = AreaClassifier.IsArea(Str(el, "addresstype"), osmClass, type);
+        var addressType = Str(el, "addresstype");
+        var isArea = AreaClassifier.IsArea(addressType, osmClass, type);
+        var isCoarse = isArea || addressType == "road" || osmClass is "highway" or "place" or "boundary" or "landuse";
         double? importance = TryDouble(el, "importance", out var imp) ? imp : null;
-        return new GeocodeHit(display, lat, lon, category, cc, country, region, locality, osmType, osmId, isArea, postcode, importance);
+        return new GeocodeHit(
+            display, lat, lon, category, cc, country, region, locality, osmType, osmId, isArea, postcode, importance,
+            houseNumber, isCoarse);
     }
 
     /// <summary>Best-effort Nominatim OSM type/class → coarse <see cref="PlaceCategory"/>.</summary>

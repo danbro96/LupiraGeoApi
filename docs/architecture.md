@@ -104,8 +104,14 @@ classDiagram
 
 `POST /places/resolve` (and the `PlaceResolver`) replaces the old exact-string dedup: (1) match an existing place by
 case-insensitive name **or alias**; (2) else forward-geocode via Nominatim and, if coordinates come back, dedupe by
-name+proximity (~60 m) or create a `Geocoded` place with coordinates + an on-demand `AdminArea` chain; (3) else
-provisionally create an unverified `User` place with no coordinates. Geocoding is optional — with no Nominatim URL
+OSM id, then name+proximity (~60 m), or create a `Geocoded` place with coordinates + an on-demand `AdminArea` chain; (3)
+else provisionally create an unverified `User` place with no coordinates.
+
+Dedupe is house-number-aware (`HouseNumber`): labels carrying different numbers ("Storgatan 5", "Storgatan 5 B") are
+never one place, and a numbered place never matches a hit coarser than it. A hit that does not pin the requested
+number (only the street, or another number) is an approximate fix: the place keeps the requested address as its name
+and takes the hit's coordinates and containment, but no OSM id and no `FormattedAddress` (both name the street), and it
+matches only a place with the same number. Regeocode applies the same rule. Geocoding is optional — with no Nominatim URL
 configured it never calls out and step 3 always applies. `POST /places/resolve:batch` runs the same pipeline over up
 to 50 texts, responses aligned index-for-index.
 

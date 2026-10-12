@@ -274,7 +274,8 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
     /// <summary>Re-run forward geocoding for a place from its address/name and attach the coordinates, containment
     /// chain, and OSM id — heals a coordinate-less provisional stub (or refreshes a stale fix). Leaves the place
     /// unchanged on a no-hit or a transient geocoder outage. A frozen empty answer is always re-asked;
-    /// <paramref name="force"/> also bypasses and overwrites frozen hits.</summary>
+    /// <paramref name="force"/> also bypasses and overwrites frozen hits. A fix missing the place's house number sets
+    /// coordinates and containment only.</summary>
     public async Task<OpResult<PlaceDto>> RegeocodeAsync(Guid id, Guid actorId, bool force = false, CancellationToken ct = default)
     {
         var (status, place, error) = await RegeocodeCoreAsync(id, actorId, force, ct);
@@ -333,8 +334,9 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
         if (result.Hits.FirstOrDefault() is not { } hit)
             return (RegeocodeStatus.NoHit, null, $"No geocode result for \"{query}\".");
 
+        var approximate = HouseNumber.IsApproximateFix(query, hit) || HouseNumber.IsApproximateFix(place.CanonicalName, hit);
         place.Location = new Point(hit.Lon, hit.Lat) { SRID = 4326 };
-        place.FormattedAddress = hit.DisplayName;
+        if (!approximate) place.FormattedAddress = hit.DisplayName;
         place.WithinAreaId = await adminAreas.EnsureChainAsync(hit, ct);
         place.Source = PlaceSource.Geocoded;
 
@@ -344,14 +346,14 @@ public sealed class PlaceQueryService(GeoDbContext db, PlaceResolver resolver, G
             db.PlaceExternalIds.Remove(old);
         }
 
-        if (hit is { OsmType: { } t, OsmId: { } oid })
+        if (!approximate && hit is { OsmType: { } t, OsmId: { } oid })
         {
             var ext = new PlaceExternalId { Id = Guid.NewGuid(), PlaceId = place.Id, Scheme = ExternalScheme.Osm, Value = $"{t}/{oid}" };
             place.ExternalIds.Add(ext);
             db.PlaceExternalIds.Add(ext);
         }
 
-        db.Record(place.Id, CurationAction.Regeocoded, actorId, detail: hit.DisplayName);
+        db.Record(place.Id, CurationAction.Regeocoded, actorId, detail: approximate ? $"approximate: {hit.DisplayName}" : hit.DisplayName);
         try
         {
             await db.SaveChangesAsync(ct);

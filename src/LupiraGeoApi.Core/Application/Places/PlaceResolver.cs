@@ -67,12 +67,14 @@ public sealed class PlaceResolver(GeoDbContext db, GeocodingService geocoder, Ad
 
     /// <summary>Land one specific geocode hit as a place: dedupe by OSM identity, then by name+proximity, else create
     /// a <see cref="PlaceSource.Geocoded"/> place with coordinates and containment. Shared by text resolve (first hit)
-    /// and create-from-geocode (user-picked hit).</summary>
+    /// and create-from-geocode (user-picked hit). A hit missing the requested house number lands with its coordinates
+    /// only: its OSM id and address name the street, which every number on it shares.</summary>
     internal async Task<ResolveOutcome> ResolveFromHitAsync(string name, GeocodeHit hit, Guid? createdBy, CancellationToken ct)
     {
         var point = new Point(hit.Lon, hit.Lat) { SRID = 4326 };
         var key = PlaceTextNormalizer.Key(name);
-        var osmId = hit is { OsmType: { } t, OsmId: { } oid } ? $"{t}/{oid}" : null;
+        var approximate = HouseNumber.IsApproximateFix(name, hit);
+        var osmId = !approximate && hit is { OsmType: { } t, OsmId: { } oid } ? $"{t}/{oid}" : null;
 
         // Dedup by OSM identity first: one real-world object resolves here under many text forms (a bare name
         // vs a comma-qualified address), and name+proximity dedup misses them because the canonical name differs.
@@ -82,7 +84,11 @@ public sealed class PlaceResolver(GeoDbContext db, GeocodingService geocoder, Ad
             var byOsm = await db.Places.FirstOrDefaultAsync(
                 p => p.MergedIntoId == null && p.DeletedAt == null
                 && p.ExternalIds.Any(x => x.Scheme == ExternalScheme.Osm && x.Value == osmId), ct);
-            if (byOsm is not null) return new ResolveOutcome(byOsm, PlaceResolution.Matched);
+            if (byOsm is not null)
+            {
+                if (SameAddress(name, approximate, byOsm, hit)) return new ResolveOutcome(byOsm, PlaceResolution.Matched);
+                osmId = null;
+            }
         }
 
         // Similarity, not equality: "Bara enkelt" and "Bara enkelt, Skånegatan 59" are one venue. word_similarity is
@@ -93,8 +99,9 @@ public sealed class PlaceResolver(GeoDbContext db, GeocodingService geocoder, Ad
                 && (p.NormalizedName == key
                     || EF.Functions.TrigramsWordSimilarity(key, p.NormalizedName) >= DedupeSimilarity
                     || EF.Functions.TrigramsWordSimilarity(p.NormalizedName, key) >= DedupeSimilarity))
-            .FirstOrDefaultAsync(ct);
-        if (near is not null) return new ResolveOutcome(near, PlaceResolution.Matched);
+            .ToListAsync(ct);
+        if (near.FirstOrDefault(p => SameAddress(name, approximate, p, hit)) is { } match)
+            return new ResolveOutcome(match, PlaceResolution.Matched);
 
         var areaId = await adminAreas.EnsureChainAsync(hit, ct);
         var place = new Place
@@ -102,10 +109,10 @@ public sealed class PlaceResolver(GeoDbContext db, GeocodingService geocoder, Ad
             Id = Guid.NewGuid(),
             CanonicalName = name,
             NormalizedName = key,
-            Kind = hit.IsArea ? PlaceKind.Area : PlaceKind.Poi,
-            Category = hit.Category,
+            Kind = hit.IsArea && !approximate ? PlaceKind.Area : PlaceKind.Poi,
+            Category = approximate ? PlaceCategory.Unknown : hit.Category,
             Location = point,
-            FormattedAddress = hit.DisplayName,
+            FormattedAddress = approximate ? null : hit.DisplayName,
             WithinAreaId = areaId,
             Source = PlaceSource.Geocoded,
             Verified = false,
@@ -115,8 +122,16 @@ public sealed class PlaceResolver(GeoDbContext db, GeocodingService geocoder, Ad
         if (osmId is not null)
             place.ExternalIds.Add(new PlaceExternalId { Id = Guid.NewGuid(), PlaceId = place.Id, Scheme = ExternalScheme.Osm, Value = osmId });
         db.Places.Add(place);
-        db.Record(place.Id, CurationAction.Created, createdBy, detail: place.CanonicalName);
+        var detail = approximate ? $"{place.CanonicalName} (approximate: {hit.DisplayName})" : place.CanonicalName;
+        db.Record(place.Id, CurationAction.Created, createdBy, detail: detail);
         await db.SaveChangesAsync(ct);
         return new ResolveOutcome(place, PlaceResolution.Geocoded);
     }
+
+    /// <summary>Under an approximate fix only the same house number identifies the place; otherwise a numbered
+    /// candidate must neither contradict the request nor be coarser than the hit.</summary>
+    private static bool SameAddress(string name, bool approximate, Place candidate, GeocodeHit hit) =>
+        approximate
+            ? HouseNumber.Find(candidate.CanonicalName) == HouseNumber.Find(name)
+            : !HouseNumber.Conflicts(name, candidate.CanonicalName) && !HouseNumber.IsApproximateFix(candidate.CanonicalName, hit);
 }
