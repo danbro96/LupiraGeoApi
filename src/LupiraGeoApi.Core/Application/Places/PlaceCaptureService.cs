@@ -47,7 +47,9 @@ public sealed class PlaceCaptureService(
             }
         }
 
-        var name = PlaceTextNormalizer.Canonical(string.IsNullOrWhiteSpace(r.Name) ? PlaceNaming.FromHit(hit) : r.Name);
+        // A client hit's locality is the reverse geocode's (for containment); its name keeps the client's address.
+        var defaultName = approximate ? hit.DisplayName : PlaceNaming.FromHit(hit);
+        var name = PlaceTextNormalizer.Canonical(string.IsNullOrWhiteSpace(r.Name) ? defaultName : r.Name);
         ResolveOutcome outcome;
         try
         {
